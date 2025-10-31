@@ -97,6 +97,7 @@
             <div class="flex flex-col md:flex-row gap-4 pt-4 h-[calc(100%-80px)]">
                 <div class="w-full md:w-3/4 h-full border border-gray-200 rounded-md relative bg-gray-50">
                     <div id="networkDiagram" class="w-full h-full"></div>
+                    <!-- ★ 左上へ移設（right-2 → left-2） -->
                     <div class="absolute top-2 left-2 flex gap-2">
                         <button id="downloadJPEGButton" class="bg-blue-600 text-white font-medium py-2 px-4 rounded-md shadow hover:bg-blue-700 text-sm transition-colors">
                             JPEGで保存
@@ -626,7 +627,7 @@ ${text}
                                            <h4 class="node-info-header">${file.fileName}</h4>
                                            <div class="node-info-content">${importantPoints}</div>
                                          </div>`;
-                            textToSave += `■ ${file.fileName}\n${importantPoints}\n\n`;
+                            textToSave += `■ ${file.fileName}\n${重要ポイント}\n\n`;
                         });
 
                         nodeInfoDiv.innerHTML = infoHtml;
