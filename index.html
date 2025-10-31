@@ -82,11 +82,11 @@
                    accept=".pdf,.docx,.pptx"
                    multiple 
                    class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
+            <!-- ★★★ 修正: ファイル名ルールの説明を簡素化 ★★★ -->
             <p class="text-xs text-gray-500 mt-1">
                 ファイル名ルール (必須):<br>
-                1. `企画書No_発行年_前フェーズ企画書No_Stage?_カテゴリ_資料名.xxx` (Stage1-5, カテゴリA-E)<br>
-                2. `企画書No_発行年_前フェーズ企画書No_カテゴリ_資料名.xxx` (Stageなし)<br>
-                3. `企画書No_発行年_前フェーズ企画書No_資料名.xxx` (Stage, カテゴリなし)<br>
+                `企画書No_発行年_前フェーズ企画書No_Stage?_カテゴリ_資料名.xxx`<br>
+                (Stage1-5, カテゴリA-E)<br>
                 (新規の場合は前フェーズNoを `0000`、複数参照は `No1ANDNo2` と表記)
             </p>
         </div>
@@ -589,56 +589,25 @@ ${truncatedText}
             const stageOrder = ['Stage5', 'Stage4', 'Stage3', 'Stage2', 'Stage1', 'Unknown'];
             const categoryOrder = ['A', 'B', 'C', 'D', 'E', 'default', 'error'];
 
-            // ★★★ 修正: ファイル名解析ロジック (db.sort内) ★★★
+            // ★★★ 修正: ファイル名解析ロジック (db.sort内) - 6要素ルールのみ ★★★
             const parseFileName = (fileName) => {
                 const baseName = fileName.substring(0, fileName.lastIndexOf('.')) || fileName;
                 const parts = baseName.split('_');
                 
-                let docId, year, prevDocIdsStr, stage, cat; // ★ prevDocIdsStr はここでは不要
+                let docId, year, stage, cat;
 
-                docId = parts[0] || baseName;
-                year = 'Unknown';
-                stage = 'Unknown';
-                cat = 'default';
-
-                if (parts.length >= 4) {
+                if (parts.length >= 6) {
+                    // Rule 1: No_年_前No_Stage_カテゴリ_資料名
+                    docId = parts[0] || baseName;
                     year = parts[1];
-                    // prevDocIdsStr = parts[2]; // ソートには不要
-                }
-
-                if (parts.length >= 5) {
-                    const part3 = parts[3].trim();
-                    if (part3.startsWith('Stage')) {
-                        // Has Stage. Check for Category in part 4.
-                        stage = part3;
-                        if (parts.length >= 6) {
-                            const part4 = parts[4].toUpperCase().trim();
-                            if (categoryOrder.includes(part4)) {
-                                // Rule 1: No_年_前No_Stage_カテゴリ_資料名
-                                cat = part4;
-                            } else {
-                                // Rule: No_年_前No_Stage_資料名 (no category)
-                                cat = 'default';
-                            }
-                        } else {
-                             // Rule: No_年_前No_Stage_資料名 (no category, 5 parts)
-                             cat = 'default';
-                        }
-                    } else if (categoryOrder.includes(part3.toUpperCase())) {
-                        // No Stage, but has Category.
-                        // Rule 2: No_年_前No_カテゴリ_資料名
-                        stage = 'Unknown';
-                        cat = part3.toUpperCase();
-                    } else {
-                        // No Stage, No Category.
-                        // Rule 3: No_年_前No_資料名
-                        stage = 'Unknown';
-                        cat = 'default';
-                    }
-                }
-                
-                if (parts.length < 4) {
-                    cat = 'error';
+                    stage = parts[3].startsWith('Stage') ? parts[3].trim() : 'Unknown';
+                    cat = categoryOrder.includes(parts[4].toUpperCase().trim()) ? parts[4].toUpperCase().trim() : 'default';
+                } else {
+                    // ルール外
+                    docId = parts[0] || baseName;
+                    year = 'Unknown';
+                    stage = 'Unknown';
+                    cat = 'error'; // ルール外は 'error' カテゴリ
                 }
                 return { docId, year, stage, cat };
             };
@@ -701,52 +670,23 @@ ${truncatedText}
 
                 let docId, year, prevDocIdsStr, stage, category;
 
-                // ★★★ 修正: ファイル名ルール解析 (analysisMap作成用) ★★★
-                docId = parts[0] || baseName;
-                year = 'Unknown';
-                prevDocIdsStr = '0000';
-                stage = 'Unknown';
-                category = 'default';
-
-                if (parts.length >= 4) {
+                // ★★★ 修正: ファイル名ルール解析 (analysisMap作成用) - 6要素ルールのみ ★★★
+                if (parts.length >= 6) {
+                    // Rule 1: No_年_前No_Stage_カテゴリ_資料名
+                    docId = parts[0] || baseName;
                     year = parts[1];
                     prevDocIdsStr = parts[2];
+                    stage = parts[3].startsWith('Stage') ? parts[3].trim() : 'Unknown';
+                    category = categoryOrder.includes(parts[4].toUpperCase().trim()) ? parts[4].toUpperCase().trim() : 'default';
+                } else {
+                    // ルール外
+                    docId = parts[0] || baseName;
+                    year = 'Unknown';
+                    prevDocIdsStr = '0000';
+                    stage = 'Unknown';
+                    category = 'error'; // ルール外は 'error' カテゴリ
                 }
 
-                if (parts.length >= 5) {
-                    const part3 = parts[3].trim();
-                    if (part3.startsWith('Stage')) {
-                        // Has Stage. Check for Category in part 4.
-                        stage = part3;
-                        if (parts.length >= 6) {
-                            const part4 = parts[4].toUpperCase().trim();
-                            if (categoryOrder.includes(part4)) {
-                                // Rule 1: No_年_前No_Stage_カテゴリ_資料名
-                                category = part4;
-                            } else {
-                                // Rule: No_年_前No_Stage_資料名 (no category)
-                                category = 'default';
-                            }
-                        } else {
-                             // Rule: No_年_前No_Stage_資料名 (no category, 5 parts)
-                             category = 'default';
-                        }
-                    } else if (categoryOrder.includes(part3.toUpperCase())) {
-                        // No Stage, but has Category.
-                        // Rule 2: No_年_前No_カテゴリ_資料名
-                        stage = 'Unknown';
-                        category = part3.toUpperCase();
-                    } else {
-                        // No Stage, No Category.
-                        // Rule 3: No_年_前No_資料名
-                        stage = 'Unknown';
-                        category = 'default';
-                    }
-                }
-                
-                if (parts.length < 4) {
-                    category = 'error';
-                }
 
                 // ★ analysisMap にデータを集約
                 if (!analysisMap.has(docId)) {
@@ -842,14 +782,13 @@ ${truncatedText}
                 const currentNodeDocId = parts[0]; // ★ このノードの docId
                 let prevDocIdsStr;
 
-                // ★★★ 修正: 前フェーズNoを取得 (全ルール対応) ★★★
-                if (parts.length >= 5) { // 5要素 (Stage or Cat) または 6要素 (Stage+Cat)
+                // ★★★ 修正: 前フェーズNoを取得 (6要素ルールのみ) ★★★
+                if (parts.length >= 6) { 
                     prevDocIdsStr = parts[2];
                 }
-                else if (parts.length === 4) { // 4要素 (No_年_前No_資料名)
-                    prevDocIdsStr = parts[2]; 
+                else { 
+                    prevDocIdsStr = '0000'; // ルール外は 0000 扱い
                 }
-                else { prevDocIdsStr = '0000'; }
 
 
                 // エッジの追加
