@@ -404,31 +404,15 @@ ${text}
         }
 
         // ====== 関係図 ======
-        function showNetworkDiagram() {
-            networkModal.classList.remove('invisible', 'opacity-0');
-            networkModal.querySelector('.modal-content').classList.remove('scale-95');
-            setTimeout(drawNetworkDiagram, 50);
-            nodeInfoDiv.innerHTML = '<p class="text-gray-500">ネットワーク図のノードをクリックすると、ここに要約が表示されます。</p>';
-            downloadInfoButton.disabled = true;
-            downloadInfoButton.dataset.fileName = "";
-        }
-        function hideNetworkDiagram() {
-            networkModal.classList.add('invisible', 'opacity-0');
-            networkModal.querySelector('.modal-content').classList.add('scale-95');
-        }
-
-        // ルール固定の順序
         const stageOrder = ['Stage5', 'Stage4', 'Stage3', 'Stage2', 'Stage1', 'Unknown'];
         const categoryOrder = ['A', 'B', 'C', 'D', 'E', 'default', 'error'];
 
-        // 厳密パーサ：5つのアンダーバー＝6フィールドを前提
+        // 厳密パーサ：6フィールド固定 [docId, year, prev, stage, cat, title]
         function parseFileNameStrict(fileName) {
             const base = fileName.includes('.') ? fileName.slice(0, fileName.lastIndexOf('.')) : fileName;
             const parts = base.split('_');
 
-            // 期待: [docId, year, prev, stage, cat, title]
             if (parts.length < 6) {
-                // 形式不備
                 return {
                     ok: false,
                     docId: parts[0] || base,
@@ -441,7 +425,7 @@ ${text}
             }
 
             const [docId, yearRaw, prevRaw, stageRaw, catRaw] = parts;
-            const title = parts[5]; // ルール上、資料名にアンダーバーは使用しない
+            const title = parts[5];
 
             const year = /^\d{4}$/.test(yearRaw) ? yearRaw : 'Unknown';
             const stage = /^Stage[1-5]$/.test(stageRaw) ? stageRaw : 'Unknown';
@@ -449,6 +433,24 @@ ${text}
             const prev = prevRaw && prevRaw !== '0000' ? prevRaw : '0000';
 
             return { ok: true, docId, year, prev, stage, cat, title };
+        }
+
+        // 特別ノード条件：企画書No(docId)に「テーマ審議会」または「棚入れ」を含む
+        function isSpecialDocId(docId) {
+            return docId.includes('テーマ審議会') || docId.includes('棚入れ');
+        }
+
+        function showNetworkDiagram() {
+            networkModal.classList.remove('invisible', 'opacity-0');
+            networkModal.querySelector('.modal-content').classList.remove('scale-95');
+            setTimeout(drawNetworkDiagram, 50);
+            nodeInfoDiv.innerHTML = '<p class="text-gray-500">ネットワーク図のノードをクリックすると、ここに要約が表示されます。</p>';
+            downloadInfoButton.disabled = true;
+            downloadInfoButton.dataset.fileName = "";
+        }
+        function hideNetworkDiagram() {
+            networkModal.classList.add('invisible', 'opacity-0');
+            networkModal.querySelector('.modal-content').classList.add('scale-95');
         }
 
         function drawNetworkDiagram() {
@@ -466,12 +468,13 @@ ${text}
                 return;
             }
 
-            // 年の一覧（パース結果から抽出）
+            // 年の一覧
             const years = [...new Set(db.map(item => parseFileNameStrict(item.id).year))].sort();
             const yearMap = new Map();
             years.forEach((y, i) => yearMap.set(y, i));
 
-            const analysisMap = new Map(); // docId -> {year, stage, cat, files:[], prev}
+            // docIdごとに集約
+            const analysisMap = new Map(); // docId -> {year, stage, cat, files:[], prevSet:Set, isSpecial:boolean}
             db.forEach(item => {
                 const p = parseFileNameStrict(item.id);
                 const key = p.docId;
@@ -482,7 +485,8 @@ ${text}
                         stage: p.stage,
                         cat: p.cat,
                         files: [],
-                        prevSet: new Set()
+                        prevSet: new Set(),
+                        isSpecial: isSpecialDocId(p.docId) // ★ 追加: 特別ノード判定（docIdのみを見る）
                     });
                 }
                 analysisMap.get(key).files.push({
@@ -510,26 +514,38 @@ ${text}
             const xStep = 250;
             const yStageStep = 150;
             const yCatStep = 100;
-            const yCounters = {}; // 同一(year,stage,cat)内での重なり回避
+
+            // ★ 特別ノード用：Stage5ラインより少し上に固定（年ごとに縦位置をずらす）
+            const SPECIAL_BASE = -60;   // Stage5帯より少し上（Stage5のy=0の上）
+            const SPECIAL_STEP = 80;    // 同一年内での重なり回避
+            const specialCounters = {}; // yearIndex -> count
+
+            const yCounters = {}; // 通常ノード重なり回避
 
             sortedNodesData.forEach(([docId, data]) => {
                 const xIndex = yearMap.get(data.year) ?? 0;
                 const x = xIndex * xStep;
 
-                const yStageIdx = stageOrder.indexOf(data.stage);
-                const yCatIdx = categoryOrder.indexOf(data.cat);
-                const yStage = yStageIdx * yStageStep;
-                const yCat = yCatIdx * yCatStep;
+                let y;
+                if (data.isSpecial) {
+                    if (specialCounters[xIndex] == null) specialCounters[xIndex] = 0;
+                    y = SPECIAL_BASE - (specialCounters[xIndex] * SPECIAL_STEP);
+                    specialCounters[xIndex]++;
+                } else {
+                    const yStageIdx = stageOrder.indexOf(data.stage);
+                    const yCatIdx = categoryOrder.indexOf(data.cat);
+                    const yStage = yStageIdx * yStageStep;
+                    const yCat = yCatIdx * yCatStep;
 
-                const yKey = `${xIndex}_${yStageIdx}_${yCatIdx}`;
-                if (!yCounters[yKey]) yCounters[yKey] = 0;
-                const yOffset = yCounters[yKey] * 100;
-                yCounters[yKey]++;
+                    const yKey = `${xIndex}_${yStageIdx}_${yCatIdx}`;
+                    if (!yCounters[yKey]) yCounters[yKey] = 0;
+                    const yOffset = yCounters[yKey] * 100;
+                    yCounters[yKey]++;
 
-                const y = yStage + yCat + yOffset;
+                    y = yStage + yCat + yOffset;
+                }
 
                 const fileTitles = data.files.map(f => f.fileName).join('\n');
-
                 nodes.push({
                     id: docId,
                     label: `${docId}\n(${data.cat} / ${data.stage} / ${data.year})`,
@@ -559,15 +575,15 @@ ${text}
                 });
             });
 
-            // グループ色（vis-networkの仕様に準拠：colorオブジェクト配下）
+            // グループ色（枠線は黒で統一）
             const groupColors = {
-                'A': { color: { background: '#FFF59D', border: '#FBC02D', highlight:{background:'#FFE082',border:'#F9A825'} } },
-                'B': { color: { background: '#A5D6A7', border: '#43A047', highlight:{background:'#C8E6C9',border:'#2E7D32'} } },
-                'C': { color: { background: '#90CAF9', border: '#1E88E5', highlight:{background:'#BBDEFB',border:'#1565C0'} } },
-                'D': { color: { background: '#CE93D8', border: '#8E24AA', highlight:{background:'#E1BEE7',border:'#6A1B9A'} } },
-                'E': { color: { background: '#F48FB1', border: '#D81B60', highlight:{background:'#F8BBD0',border:'#AD1457'} } },
-                'default': { color: { background: '#B0BEC5', border: '#546E7A', highlight:{background:'#CFD8DC',border:'#37474F'} } },
-                'error': { color: { background: '#FFAB91', border: '#E64A19', highlight:{background:'#FFCCBC',border:'#BF360C'} } }
+                'A': { color: { background: '#FFF59D', border: '#000000', highlight:{background:'#FFE082',border:'#000000'} } },
+                'B': { color: { background: '#A5D6A7', border: '#000000', highlight:{background:'#C8E6C9',border:'#000000'} } },
+                'C': { color: { background: '#90CAF9', border: '#000000', highlight:{background:'#BBDEFB',border:'#000000'} } },
+                'D': { color: { background: '#CE93D8', border: '#000000', highlight:{background:'#E1BEE7',border:'#000000'} } },
+                'E': { color: { background: '#F48FB1', border: '#000000', highlight:{background:'#F8BBD0',border:'#000000'} } },
+                'default': { color: { background: '#B0BEC5', border: '#000000', highlight:{background:'#CFD8DC',border:'#000000'} } },
+                'error': { color: { background: '#FFAB91', border: '#000000', highlight:{background:'#FFCCBC',border:'#000000'} } }
             };
 
             const data = { nodes, edges };
@@ -585,7 +601,7 @@ ${text}
                 groups: groupColors,
                 interaction: { dragNodes: true, dragView: true, zoomView: true, hover: true },
                 edges: {
-                    color: { inherit: false },       // ← 二重ネストの修正（崩れ対策）
+                    color: { inherit: false },
                     smooth: { type: 'cubicBezier', forceDirection: "horizontal", roundness: 0.1 }
                 }
             };
