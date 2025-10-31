@@ -84,8 +84,9 @@
                    class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
             <p class="text-xs text-gray-500 mt-1">
                 ファイル名ルール (必須):<br>
-                1. `企画書No_発行年_前フェーズ企画書No_カテゴリ_資料名.xxx` (カテゴリA-E)<br>
-                2. `企画書No_発行年_前フェーズ企画書No_資料名.xxx` (カテゴリ無し)<br>
+                1. `企画書No_発行年_前フェーズ企画書No_Stage?_カテゴリ_資料名.xxx` (Stage1-5, カテゴリA-E)<br>
+                2. `企画書No_発行年_前フェーズ企画書No_カテゴリ_資料名.xxx` (Stageなし)<br>
+                3. `企画書No_発行年_前フェーズ企画書No_資料名.xxx` (Stage, カテゴリなし)<br>
                 (新規の場合は前フェーズNoを `0000`、複数参照は `No1ANDNo2` と表記)
             </p>
         </div>
@@ -126,7 +127,8 @@
 
     <!-- ネットワーク図 表示モーダル -->
     <div id="networkModal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 opacity-0 invisible z-50">
-        <div class="modal-content bg-white rounded-xl shadow-2xl w-full max-w-7xl h-[90vh] p-6 transform scale-95">
+        <!-- ★ 修正: max-w-7xl -> max-w-full, h-[90vh] -> h-[95vh] (表示エリア拡大) -->
+        <div class="modal-content bg-white rounded-xl shadow-2xl w-full max-w-full h-[95vh] p-6 transform scale-95">
             <!-- モーダルヘッダー -->
             <div class="flex justify-between items-center pb-4 border-b border-gray-200">
                 <h2 class="text-2xl font-bold text-gray-800">ドキュメント関係図</h2>
@@ -137,8 +139,8 @@
             
             <!-- モーダルコンテンツ (図と情報) -->
             <div class="flex flex-col md:flex-row gap-4 pt-4 h-[calc(100%-80px)]">
-                <!-- ネットワーク図エリア -->
-                <div class="w-full md:w-2/3 h-full border border-gray-200 rounded-md relative bg-gray-50">
+                <!-- ★ 修正: md:w-2/3 -> md:w-3/4 (グラフエリア拡大) -->
+                <div class="w-full md:w-3/4 h-full border border-gray-200 rounded-md relative bg-gray-50">
                     <div id="networkDiagram" class="w-full h-full"></div>
                     <!-- ボタン類 -->
                     <div class="absolute top-2 right-2 flex gap-2">
@@ -151,8 +153,8 @@
                     </div>
                 </div>
                 
-                <!-- 情報表示エリア -->
-                <div class="w-full md:w-1/3">
+                <!-- ★ 修正: md:w-1/3 -> md:w-1/4 (情報エリア縮小) -->
+                <div class="w-full md:w-1/4">
                     <div class="flex justify-between items-center mb-2">
                         <h3 class="text-lg font-semibold">重要ポイント</h3>
                         <button id="downloadInfoButton" 
@@ -572,7 +574,7 @@ ${truncatedText}
         }
 
         /**
-         * ★★★ 修正: ネットワーク図を描画する (ノード集約、色分け、クリック動作変更) ★★★
+         * ★★★ 修正: ネットワーク図を描画する (グリッドレイアウト、Stage対応) ★★★
          */
         function drawNetworkDiagram() {
             if (!window.vis || !window.vis.Network) {
@@ -583,8 +585,10 @@ ${truncatedText}
 
             const db = loadDatabase();
 
-            // ★★★ 修正: dbを「年」→「企画書No」の順でソート ★★★
-            // (同じ企画書Noが近くに配置されるようにするため)
+            // ★★★ 修正: ソート順を 年 -> Stage (降順) -> カテゴリ -> 企画書No に変更 ★★★
+            const stageOrder = ['Stage5', 'Stage4', 'Stage3', 'Stage2', 'Stage1', 'Unknown'];
+            const categoryOrder = ['A', 'B', 'C', 'D', 'E', 'default', 'error'];
+
             db.sort((a, b) => {
                 const fNameA = a.id.substring(0, a.id.lastIndexOf('.')) || a.id;
                 const fNameB = b.id.substring(0, b.id.lastIndexOf('.')) || b.id;
@@ -592,31 +596,39 @@ ${truncatedText}
                 const partsA = fNameA.split('_');
                 const partsB = fNameB.split('_');
 
-                // [0]企画書No, [1]年 を取得
-                const docIdA = partsA.length > 0 ? partsA[0] : null;
-                const yearA = partsA.length > 1 ? partsA[1] : null;
-                
-                const docIdB = partsB.length > 0 ? partsB[0] : null;
-                const yearB = partsB.length > 1 ? partsB[1] : null;
+                let yearA, stageA, catA, docIdA;
+                let yearB, stageB, catB, docIdB;
 
-                // 1. 年(parts[1])でソート
-                if (yearA && yearB) {
-                    if (yearA !== yearB) {
-                        return yearA.localeCompare(yearB);
-                    }
-                } else if (yearA) {
-                    return -1; // Aを先に
-                } else if (yearB) {
-                    return 1; // Bを先に
-                }
+                // Aの解析
+                docIdA = partsA[0] || '';
+                if (partsA.length >= 6) { yearA = partsA[1]; stageA = partsA[3].startsWith('Stage') ? partsA[3] : 'Unknown'; catA = partsA[4]; }
+                else if (partsA.length === 5) { yearA = partsA[1]; stageA = 'Unknown'; catA = partsA[3]; }
+                else if (partsA.length === 4) { yearA = partsA[1]; stageA = 'Unknown'; catA = 'default'; }
+                else { yearA = 'Unknown'; stageA = 'Unknown'; catA = 'error'; }
+
+                // Bの解析
+                docIdB = partsB[0] || '';
+                if (partsB.length >= 6) { yearB = partsB[1]; stageB = partsB[3].startsWith('Stage') ? partsB[3] : 'Unknown'; catB = partsB[4]; }
+                else if (partsB.length === 5) { yearB = partsB[1]; stageB = 'Unknown'; catB = partsB[3]; }
+                else if (partsB.length === 4) { yearB = partsB[1]; stageB = 'Unknown'; catB = 'default'; }
+                else { yearB = 'Unknown'; stageB = 'Unknown'; catB = 'error'; }
+
+
+                // 1. 年(parts[1])でソート (昇順)
+                if (yearA !== yearB) return yearA.localeCompare(yearB);
                 
-                // 2. 企画書No(parts[0])でソート (年が同じ場合)
-                if (docIdA && docIdB) {
-                    return docIdA.localeCompare(docIdB);
-                }
+                // 2. Stageでソート (降順 = stageOrderのインデックス昇順)
+                const stageIndexA = stageOrder.indexOf(stageA);
+                const stageIndexB = stageOrder.indexOf(stageB);
+                if (stageIndexA !== stageIndexB) return stageIndexA - stageIndexB;
                 
-                // フォールバック
-                return a.id.localeCompare(b.id);
+                // 3. カテゴリでソート (昇順)
+                const catIndexA = categoryOrder.indexOf(catA);
+                const catIndexB = categoryOrder.indexOf(catB);
+                if (catIndexA !== catIndexB) return catIndexA - catIndexB;
+
+                // 4. 企画書Noでソート (昇順)
+                return docIdA.localeCompare(docIdB);
             });
             // ★★★ ソート処理ここまで ★★★
 
@@ -628,13 +640,24 @@ ${truncatedText}
 
             const nodes = [];
             const edges = [];
-            // ★★★ 修正: analysisMap の構造変更 ★★★
+            // ★★★ 修正: analysisMap の構造変更 (stage追加) ★★★
             // キー: docId (企画書No)
-            // 値: { year: string, category: string, files: Array<{fileName: string, analysis: string}> }
+            // 値: { year: string, category: string, stage: string, files: Array<{...}> }
             const analysisMap = new Map();
-            const yearLevels = {};
-            let levelCounter = 0;
             
+            // ★★★ グリッドレイアウト用のMap ★★★
+            const yearMap = new Map();
+            const stageMap = new Map();
+            const categoryMap = new Map();
+            
+            // Y軸: Stage (Stage5が上 = index 0)
+            stageOrder.forEach((stage, index) => stageMap.set(stage, index));
+            // Y軸(サブ): カテゴリ
+            categoryOrder.forEach((cat, index) => categoryMap.set(cat, index));
+            // X軸: 年
+            const sortedYears = [...new Set(db.map(item => (item.id.split('_')[1] || 'Unknown')))].sort();
+            sortedYears.forEach((year, index) => yearMap.set(year, index));
+
 
             // --- 1. ノードデータの集約 (全データをスキャン) ---
             db.forEach(item => {
@@ -643,40 +666,48 @@ ${truncatedText}
                 const baseName = fileName.substring(0, fileName.lastIndexOf('.')) || fileName;
                 const parts = baseName.split('_');
 
-                let docId, year, category;
+                let docId, year, prevDocIdsStr, stage, category;
 
-                // ファイル名ルール解析
-                if (parts.length >= 5) {
-                    // 新ルール: No_年_前No_カテゴリ_資料名
+                // ★★★ 修正: ファイル名ルール解析 (Stage対応) ★★★
+                if (parts.length >= 6) {
+                    // New rule: No_年_前No_Stage_カテゴリ_資料名
                     docId = parts[0];
                     year = parts[1];
+                    prevDocIdsStr = parts[2]; // for edges
+                    stage = parts[3].startsWith('Stage') ? parts[3] : 'Unknown';
+                    category = parts[4].toUpperCase();
+                } else if (parts.length === 5) {
+                    // Old rule 2: No_年_前No_カテゴリ_資料名
+                    docId = parts[0];
+                    year = parts[1];
+                    prevDocIdsStr = parts[2]; // for edges
+                    stage = 'Unknown'; // No stage info
                     category = parts[3].toUpperCase();
                 } else if (parts.length === 4) {
-                    // 旧ルール: No_年_前No_資料名
+                    // Old rule 1: No_年_前No_資料名
                     docId = parts[0];
                     year = parts[1];
+                    prevDocIdsStr = parts[2]; // for edges
+                    stage = 'Unknown';
                     category = 'default';
                 } else {
-                    // ルール違反
-                    console.warn(`ファイル名ルール違反 (ノード): ${fileName}`);
-                    docId = baseName; // ノードIDをbaseNameにする
+                    // Rule violation
+                    docId = baseName;
                     year = 'Unknown';
+                    prevDocIdsStr = '0000';
+                    stage = 'Unknown';
                     category = 'error';
                 }
 
                 // ★ analysisMap にデータを集約
-                // (docIdがまだMapになければ、新しいエントリを作成)
                 if (!analysisMap.has(docId)) {
-                    // 年ごとのレベルを決定 (最初に見つかった年を採用)
-                    if (!yearLevels[year]) {
-                        yearLevels[year] = levelCounter++;
-                    }
-                    // Mapに基本情報を登録 (最初に見つかったカテゴリをノードの色として採用)
+                    // Mapに基本情報を登録 (最初に見つかったカテゴリとStageを採用)
                     analysisMap.set(docId, {
                         year: year,
                         category: category,
-                        level: yearLevels[year],
+                        stage: stage, // ★ Store stage
                         files: []
+                        // levelは使わない
                     });
                 }
                 
@@ -692,12 +723,21 @@ ${truncatedText}
                 // ホバー時に表示するファイルリストを作成
                 const fileTitles = data.files.map(f => f.fileName).join('\n');
                 
+                // ★★★ 修正: X, Y座標を手動計算 ★★★
+                const x = (yearMap.get(data.year) || 0) * 450; // X軸 = 年 (450px間隔)
+                
+                const y_stage = (stageMap.get(data.stage) || stageMap.get('Unknown')) * 250; // Y軸 = Stage (250px間隔)
+                const y_category = (categoryMap.get(data.category) || categoryMap.get('default')) * 40; // Y軸(サブ) = カテゴリ (40px間隔)
+                const y = y_stage + y_category;
+
                 nodes.push({
                     id: docId, // ★ IDは docId (企画書No)
-                    label: `${docId}\n(${data.year})`, // ラベルも docId
+                    label: `${docId}\n(${data.stage} / ${data.year})`, // ★ ラベル変更
                     title: fileTitles, // ホバータイトルはファイルリスト
-                    level: data.level,
-                    group: data.category // ★ 色分けを再実装
+                    group: data.category, // ★ 色分け
+                    x: x,  // ★ X座標を指定
+                    y: y,  // ★ Y座標を指定
+                    fixed: false // ★ 物理エンジンで多少重なりを避ける
                 });
             });
 
@@ -712,12 +752,12 @@ ${truncatedText}
                 const currentNodeDocId = parts[0]; // ★ このノードの docId
                 let prevDocIdsStr;
 
-                // 前フェーズNoを取得 (新旧ルール対応)
-                if (parts.length >= 4) {
-                    prevDocIdsStr = parts[2];
-                } else {
-                    prevDocIdsStr = '0000'; // ルール違反はエッジなし
-                }
+                // ★★★ 修正: 前フェーズNoを取得 (全ルール対応) ★★★
+                if (parts.length >= 6) { prevDocIdsStr = parts[2]; }
+                else if (parts.length === 5) { prevDocIdsStr = parts[2]; }
+                else if (parts.length === 4) { prevDocIdsStr = parts[2]; }
+                else { prevDocIdsStr = '0000'; }
+
 
                 // エッジの追加
                 if (prevDocIdsStr !== '0000') {
@@ -763,13 +803,22 @@ ${truncatedText}
 
             const options = {
                 layout: {
-                    hierarchical: {
-                        enabled: true,
-                        direction: 'LR', 
-                        sortMethod: 'directed'
+                    hierarchical: false // ★★★ 修正: 階層レイアウトを無効化
+                },
+                physics: { // ★★★ 修正: 物理エンジンを有効化 (重なり防止のため)
+                    enabled: true,
+                    solver: 'barnesHut',
+                    barnesHut: {
+                        gravitationalConstant: -10000,
+                        centralGravity: 0.1,
+                        springLength: 200, // X,Y指定があるので少し長め
+                        springConstant: 0.05,
+                        avoidOverlap: 0.5 // 重なりを避ける
+                    },
+                    stabilization: {
+                        iterations: 200
                     }
                 },
-                physics: false,
                 nodes: {
                     shape: 'box',
                     borderWidth: 2,
@@ -786,7 +835,8 @@ ${truncatedText}
                     smooth: {
                         enabled: true,
                         type: "cubicBezier",
-                        roundness: 0.5
+                        forceDirection: "horizontal", // ★ 横移動（年）を優先
+                        roundness: 0.3
                     },
                     color: {
                         color: '#616161',
