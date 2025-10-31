@@ -29,6 +29,7 @@
             color:#1f2937;border-bottom:1px solid #e5e7eb;padding-bottom:.25rem;
         }
         .node-info-content{ font-size:.9rem;white-space:pre-wrap;margin-bottom:1rem; }
+        .badge{display:inline-block;border-radius:.375rem;padding:.1rem .4rem;font-size:.75rem}
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
@@ -97,7 +98,7 @@
             <div class="flex flex-col md:flex-row gap-4 pt-4 h-[calc(100%-80px)]">
                 <div class="w-full md:w-3/4 h-full border border-gray-200 rounded-md relative bg-gray-50">
                     <div id="networkDiagram" class="w-full h-full"></div>
-                    <!-- ★ 左上へ移設（right-2 → left-2） -->
+                    <!-- 左上に操作ボタン -->
                     <div class="absolute top-2 left-2 flex gap-2">
                         <button id="downloadJPEGButton" class="bg-blue-600 text-white font-medium py-2 px-4 rounded-md shadow hover:bg-blue-700 text-sm transition-colors">
                             JPEGで保存
@@ -110,13 +111,13 @@
 
                 <div class="w-full md:w-1/4">
                     <div class="flex justify-between items-center mb-2">
-                        <h3 class="text-lg font-semibold">重要ポイント</h3>
+                        <h3 class="text-lg font-semibold">重要ポイント / 要約</h3>
                         <button id="downloadInfoButton"
                                 class="bg-green-500 text-white text-sm font-medium py-1 px-3 rounded-md hover:bg-green-600 transition-colors disabled:opacity-50"
                                 disabled title="ノードを選択してください">テキスト保存</button>
                     </div>
                     <div id="nodeInfo" class="bg-gray-50 p-4 rounded-md border border-gray-200 h-full min-h-[50vh] overflow-y-auto">
-                        <p class="text-gray-500">ネットワーク図のノードをクリックすると、ここに要約が表示されます。</p>
+                        <p class="text-gray-500">ネットワーク図のノードをクリックすると、ここに要約と重要ポイントが表示される。</p>
                     </div>
                 </div>
             </div>
@@ -126,7 +127,7 @@
         <div id="deleteConfirmModal" class="modal fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center p-4 opacity-0 invisible z-[60]">
             <div class="modal-content confirm-modal-content bg-white rounded-lg shadow-xl p-6 w-full max-w-sm transform scale-95 opacity-0">
                 <h3 class="text-lg font-bold text-gray-900 mb-4">履歴の全削除</h3>
-                <p class="text-sm text-gray-600 mb-6">本当に保存されている分析履歴をすべて削除しますか？この操作は元に戻せません。</p>
+                <p class="text-sm text-gray-600 mb-6">本当に保存されている分析履歴をすべて削除しますか？この操作は元に戻せない。</p>
                 <div class="flex justify-end gap-3">
                     <button id="cancelDeleteButton" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 text-sm font-medium">キャンセル</button>
                     <button id="confirmDeleteButton" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm font-medium">削除実行</button>
@@ -212,8 +213,8 @@
         confirmDeleteButton.addEventListener('click', () => {
             localStorage.removeItem(DB_KEY);
             if (currentNetwork) { currentNetwork.destroy(); currentNetwork = null; }
-            networkDiagramDiv.innerHTML = '<p class="p-4 text-gray-500">履歴がクリアされました。</p>';
-            nodeInfoDiv.innerHTML = '<p class="text-gray-500">ネットワーク図のノードをクリックすると、ここに要約が表示されます。</p>';
+            networkDiagramDiv.innerHTML = '<p class="p-4 text-gray-500">履歴がクリアされた。</p>';
+            nodeInfoDiv.innerHTML = '<p class="text-gray-500">ネットワーク図のノードをクリックすると、ここに要約と重要ポイントが表示される。</p>';
             downloadInfoButton.disabled = true;
             deleteConfirmModal.classList.add('invisible', 'opacity-0');
             deleteConfirmModal.querySelector('.modal-content').classList.add('scale-95');
@@ -226,7 +227,7 @@
 
             if (!apiKey) return showError("APIキーを入力してください。");
             if (files.length === 0) return showError("分析するファイルを選択してください。");
-            if (files.length > 20) return showError("一度に分析できるファイルは20件までです。");
+            if (files.length > 20) return showError("一度に分析できるファイルは20件までである。");
 
             hideError(); hideResult();
             showLoading(`ファイル ${files.length}件を処理中...`);
@@ -251,15 +252,15 @@
                 await Promise.all(jobs);
                 hideLoading();
                 if (successCount > 0) {
-                    const summary = `${files.length}件中 ${successCount}件の分析と保存に成功しました。`;
+                    const summary = `${files.length}件中 ${successCount}件の分析と保存に成功した。`;
                     const shortResult = firstSuccessResult.length > 100 ? firstSuccessResult.slice(0, 100) + "..." : firstSuccessResult;
                     showResult(summary, shortResult);
                 } else {
-                    showError("全ファイルの分析に失敗しました。コンソールを確認してください。");
+                    showError("全ファイルの分析に失敗した。コンソールを確認してほしい。");
                 }
             } catch (err) {
                 hideLoading();
-                showError(`予期せぬエラーが発生しました: ${err.message}`);
+                showError(`予期せぬエラーが発生: ${err.message}`);
             }
         }
 
@@ -326,7 +327,7 @@
         async function callGeminiAPI(text, apiKey) {
             const MAX_TEXT_LENGTH = 100000;
             if (text.length > MAX_TEXT_LENGTH) {
-                text = text.substring(0, MAX_TEXT_LENGTH) + "... (テキストが長すぎるため省略されました)";
+                text = text.substring(0, MAX_TEXT_LENGTH) + "... (テキストが長すぎるため省略)";
             }
             const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
@@ -368,7 +369,7 @@ ${text}
 
             const result = await response.json();
             const textOut = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (!textOut) throw new Error("APIからの応答が予期した形式ではありません。");
+            if (!textOut) throw new Error("APIからの応答が予期した形式ではない。");
             return textOut;
         }
 
@@ -445,7 +446,7 @@ ${text}
             networkModal.classList.remove('invisible', 'opacity-0');
             networkModal.querySelector('.modal-content').classList.remove('scale-95');
             setTimeout(drawNetworkDiagram, 50);
-            nodeInfoDiv.innerHTML = '<p class="text-gray-500">ネットワーク図のノードをクリックすると、ここに要約が表示されます。</p>';
+            nodeInfoDiv.innerHTML = '<p class="text-gray-500">ネットワーク図のノードをクリックすると、ここに要約と重要ポイントが表示される。</p>';
             downloadInfoButton.disabled = true;
             downloadInfoButton.dataset.fileName = "";
         }
@@ -487,7 +488,7 @@ ${text}
                         cat: p.cat,
                         files: [],
                         prevSet: new Set(),
-                        isSpecial: isSpecialDocId(p.docId) // ★ 追加: 特別ノード判定（docIdのみを見る）
+                        isSpecial: isSpecialDocId(p.docId)
                     });
                 }
                 analysisMap.get(key).files.push({
@@ -516,10 +517,10 @@ ${text}
             const yStageStep = 150;
             const yCatStep = 100;
 
-            // ★ 特別ノード用：Stage5ラインより少し上に固定（年ごとに縦位置をずらす）
-            const SPECIAL_BASE = -100;   // Stage5帯より少し上（Stage5のy=0の上）
-            const SPECIAL_STEP = 80;    // 同一年内での重なり回避
-            const specialCounters = {}; // yearIndex -> count
+            // 特別ノード：Stage5ラインより少し上に固定（年ごとに縦位置をずらす）
+            const SPECIAL_BASE = -100;   // Stage5(y=0)より上
+            const SPECIAL_STEP = 80;     // 同一年内の重なり回避
+            const specialCounters = {};  // yearIndex -> count
 
             const yCounters = {}; // 通常ノード重なり回避
 
@@ -609,6 +610,7 @@ ${text}
 
             currentNetwork = new window.vis.Network(networkDiagramDiv, data, options);
 
+            // ====== クリック時：要約と重要ポイントを安全に抽出して表示 ======
             currentNetwork.on("click", function (params) {
                 if (params.nodes.length > 0) {
                     const nodeId = params.nodes[0];
@@ -620,14 +622,36 @@ ${text}
 
                         nodeData.files.forEach(file => {
                             const analysisText = file.analysis || '';
-                            const pointsMatch = analysisText.match(/【技術の棚入れ \(重要ポイント\)】([\s\S]*)/);
-                            const importantPoints = pointsMatch ? pointsMatch[1].trim() : '重要ポイントがありません。';
 
-                            infoHtml += `<div class="node-info-block">
-                                           <h4 class="node-info-header">${file.fileName}</h4>
-                                           <div class="node-info-content">${importantPoints}</div>
-                                         </div>`;
-                            textToSave += `■ ${file.fileName}\n${重要ポイント}\n\n`;
+                            // 要約抽出（次の見出し or 末尾まで）
+                            const summaryMatch = analysisText.match(/【内容の要約[^】]*】([\s\S]*?)(?=【|$)/);
+                            const summary = summaryMatch ? summaryMatch[1].trim() : '要約が見つからない。';
+
+                            // 重要ポイント抽出（次の見出し or 末尾まで）
+                            const pointsMatch = analysisText.match(/【技術の棚入れ\s*\(重要ポイント\)】([\s\S]*?)(?=【|$)/);
+                            const importantPoints = pointsMatch ? pointsMatch[1].trim() : '重要ポイントが見つからない。';
+
+                            infoHtml += `
+                                <div class="node-info-block">
+                                    <h4 class="node-info-header">${file.fileName}</h4>
+                                    <div class="node-info-content">
+                                        <span class="badge bg-blue-100 text-blue-800 mr-2">要約</span>
+                                        ${summary}
+                                        <div class="h-2"></div>
+                                        <span class="badge bg-yellow-100 text-yellow-800 mr-2">重要ポイント</span>
+                                        ${importantPoints}
+                                    </div>
+                                </div>
+                            `;
+
+                            textToSave += `■ ${file.fileName}
+[要約]
+${summary}
+
+[重要ポイント]
+${importantPoints}
+
+`;
                         });
 
                         nodeInfoDiv.innerHTML = infoHtml;
@@ -635,17 +659,17 @@ ${text}
                         downloadInfoButton.dataset.fileName = nodeId;
                         downloadInfoButton.dataset.text = textToSave;
                     } else {
-                        nodeInfoDiv.innerHTML = '<p class="text-gray-500">ノード情報の取得に失敗しました。</p>';
+                        nodeInfoDiv.innerHTML = '<p class="text-gray-500">ノード情報の取得に失敗した。</p>';
                         downloadInfoButton.disabled = true;
                     }
                 } else {
-                    nodeInfoDiv.innerHTML = '<p class="text-gray-500">ネットワーク図のノードをクリックすると、ここに要約が表示されます。</p>';
+                    nodeInfoDiv.innerHTML = '<p class="text-gray-500">ネットワーク図のノードをクリックすると、ここに要約と重要ポイントが表示される。</p>';
                     downloadInfoButton.disabled = true;
                 }
             });
         }
 
-        // ダウンロード
+        // ダウンロード（JPEG）
         async function downloadNetworkAsJPEG() {
             if (!currentNetwork) return;
             const canvas = networkDiagramDiv.querySelector('canvas');
@@ -669,6 +693,7 @@ ${text}
             document.body.removeChild(link);
         }
 
+        // ダウンロード（要約/重要ポイント）
         function downloadNodeInfo() {
             const textToSave = downloadInfoButton.dataset.text;
             const baseFileName = downloadInfoButton.dataset.fileName || "node_info";
@@ -676,7 +701,7 @@ ${text}
             if (!textToSave) return;
 
             const safeFileName = baseFileName.replace(/[^a-z0-9_AND-]/gi, '-');
-            const fileName = `${safeFileName}_important_points.txt`;
+            const fileName = `${safeFileName}_summary_points.txt`;
 
             try {
                 const blob = new Blob([textToSave], { type: 'text/plain;charset=utf-8' });
@@ -688,7 +713,7 @@ ${text}
                 document.body.removeChild(link);
                 URL.revokeObjectURL(link.href);
             } catch (e) {
-                console.error("テキストファイルのダウンロードに失敗しました:", e);
+                console.error("テキストファイルのダウンロードに失敗:", e);
             }
         }
     </script>
