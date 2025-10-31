@@ -205,7 +205,6 @@
 
     <script type="module">
         // PDF.jsのワーカーパスを設定
-        // ★★★ 修正: グローバルスコープの pdfjsLib を window.pdfjsLib で参照 ★★★
         if (typeof window.pdfjsLib !== 'undefined') {
             window.pdfjsLib.GlobalWorkerOptions.workerSrc = document.documentElement.style.getPropertyValue('--pdf-worker-src');
         }
@@ -244,14 +243,12 @@
 
         // --- ライブラリ読み込みチェック ---
         function checkLibraries() {
-            // ★★★ 修正: グローバルライブラリを window.xxx でチェック ★★★
             if (typeof window.pdfjsLib !== 'undefined' && typeof window.JSZip !== 'undefined' && typeof window.vis !== 'undefined' && typeof window.tailwind !== 'undefined') {
                 console.log("All libraries loaded.");
                 analyzeButton.disabled = false;
                 showNetworkButton.disabled = false;
                 analyzeButton.textContent = "分析を実行";
                 showNetworkButton.textContent = "関係図を表示";
-                // ★★★ 修正: ライブラリロード後にワーカーパスを再設定 ★★★
                 window.pdfjsLib.GlobalWorkerOptions.workerSrc = document.documentElement.style.getPropertyValue('--pdf-worker-src');
             } else {
                 console.warn("Waiting for libraries to load... (pdf.js, JSZip, vis.js, tailwind)");
@@ -272,24 +269,20 @@
         downloadJPEGButton.addEventListener('click', downloadNetworkAsJPEG);
         downloadInfoButton.addEventListener('click', downloadNodeInfo);
         
-        // 履歴削除ボタン（確認モーダル表示）
         showDeleteConfirmButton.addEventListener('click', () => {
             deleteConfirmModal.classList.remove('invisible', 'opacity-0');
             deleteConfirmModal.querySelector('.modal-content').classList.remove('scale-95', 'opacity-0');
         });
 
-        // 履歴削除（キャンセル）
         cancelDeleteButton.addEventListener('click', () => {
             deleteConfirmModal.classList.add('invisible', 'opacity-0');
             deleteConfirmModal.querySelector('.modal-content').classList.add('scale-95', 'opacity-0');
         });
 
-        // 履歴削除（実行）
         confirmDeleteButton.addEventListener('click', () => {
             localStorage.removeItem(DB_KEY);
             console.log("分析履歴を削除しました。");
             
-            // ネットワーク図をクリア
             if (currentNetwork) {
                 currentNetwork.destroy();
                 currentNetwork = null;
@@ -298,7 +291,6 @@
             nodeInfoDiv.innerHTML = '<p class="text-gray-500">ネットワーク図のノードをクリックすると、ここに要約が表示されます。</p>';
             downloadInfoButton.disabled = true;
             
-            // 確認モーダルを閉じる
             deleteConfirmModal.classList.add('invisible', 'opacity-0');
             deleteConfirmModal.querySelector('.modal-content').classList.add('scale-95');
         });
@@ -342,7 +334,6 @@
                         })
                         .catch(err => {
                             console.error(`ファイル ${file.name} の処理に失敗:`, err);
-                            // 1件の失敗で全体を止めない
                         })
                 );
             }
@@ -354,7 +345,6 @@
                 
                 if (successCount > 0) {
                     const summary = `${files.length}件中 ${successCount}件の分析と保存に成功しました。`;
-                    // ★★★ 修正: 最初の結果の100文字程度を表示 ★★★
                     const shortResult = firstSuccessResult.length > 100 
                         ? firstSuccessResult.substring(0, 100) + "..."
                         : firstSuccessResult;
@@ -364,7 +354,7 @@
                     showError(`${files.length}件すべてのファイル分析に失敗しました。コンソールを確認してください。`);
                 }
 
-            } catch (err) { // Promise.all 自体は上のロジックでは失敗しないはずだが念のため
+            } catch (err) {
                 hideLoading();
                 showError(`予期せぬエラーが発生しました: ${err.message}`);
             }
@@ -403,7 +393,6 @@
         // --- テキスト抽出 ---
         async function extractTextFromPdf(file) {
             const arrayBuffer = await file.arrayBuffer();
-            // ★★★ 修正: グローバルスコープの pdfjsLib を window.pdfjsLib で参照 ★★★
             const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
             let textContent = '';
             for (let i = 1; i <= pdf.numPages; i++) {
@@ -416,7 +405,6 @@
 
         async function extractTextFromDocx(file) {
             const arrayBuffer = await file.arrayBuffer();
-            // ★★★ 修正: グローバルスコープの JSZip を window.JSZip で参照 ★★★
             const zip = await window.JSZip.loadAsync(arrayBuffer);
             const content = await zip.file("word/document.xml").async("string");
             const parser = new DOMParser();
@@ -431,7 +419,6 @@
 
         async function extractTextFromPptx(file) {
             const arrayBuffer = await file.arrayBuffer();
-            // ★★★ 修正: グローバルスコープの JSZip を window.JSZip で参照 ★★★
             const zip = await window.JSZip.loadAsync(arrayBuffer);
             const slideFiles = [];
             zip.folder("ppt/slides").forEach((relativePath, file) => {
@@ -449,15 +436,13 @@
                 for (let i = 0; i < paragraphs.length; i++) {
                     textContent += paragraphs[i].textContent + ' ';
                 }
-                textContent += '\n'; // スライドごとに改行
+                textContent += '\n';
             }
             return textContent;
         }
 
         // --- Gemini API ---
         async function callGeminiAPI(text, apiKey) {
-            // APIのコンテキスト長を考慮し、テキストを短縮 (約30kトークン制限)
-            // 簡易的に文字数で制限 (例: 10万文字)
             const MAX_TEXT_LENGTH = 100000;
             if (text.length > MAX_TEXT_LENGTH) {
                 text = text.substring(0, MAX_TEXT_LENGTH) + "... (テキストが長すぎるため省略されました)";
@@ -474,11 +459,11 @@
 ${text}
 
 # あなたのタスク:
-1.  **内容の要約 (200字程度)**: このドキュメントが何について書かれているかを簡潔に要約してください。
+1.  **内容の要約 (500字程度)**: このドキュメントが何について書かれているかを簡潔に要約してください。
 2.  **技術の棚入れ (重要ポイント)**: このドキュメントから得られる重要な知見、技術的なポイント、決定事項などを箇条書きで抽出してください。
 
 # 回答フォーマット (厳守):
-【内容の要約 (200字程度)】
+【内容の要約 (500字程度)】
 ここに要約を記述
 
 【技術の棚入れ (重要ポイント)】
@@ -509,7 +494,6 @@ ${text}
                 if (result.candidates && result.candidates[0].content) {
                     return result.candidates[0].content.parts[0].text;
                 } else {
-                    // Geminiがコンテンツをブロックした場合など
                     const safetyRating = result.candidates?.[0]?.safetyRatings?.[0];
                     if (safetyRating) {
                         throw new Error(`Geminiによってコンテンツがブロックされました (Category: ${safetyRating.category}, Probability: ${safetyRating.probability})`);
@@ -518,7 +502,7 @@ ${text}
                 }
             } catch (error) {
                 console.error("Gemini API 呼び出しエラー:", error);
-                throw error; // エラーを呼び出し元に伝播させる
+                throw error;
             }
         }
 
@@ -566,21 +550,18 @@ ${text}
         function saveAnalysis(fileName, analysisResult) {
             const db = loadDatabase();
             
-            // 既存のデータを検索
             const existingIndex = db.findIndex(item => item.id === fileName);
             
             const newData = {
-                id: fileName, // ファイル名をIDとする
+                id: fileName,
                 analysis: analysisResult,
                 savedAt: new Date().toISOString()
             };
 
             if (existingIndex > -1) {
-                // 既に存在する場合は上書き
                 db[existingIndex] = newData;
                 console.log(`分析結果を更新しました: ${fileName}`);
             } else {
-                // 存在しない場合は追加
                 db.push(newData);
                 console.log(`分析結果を保存しました: ${fileName}`);
             }
@@ -594,13 +575,10 @@ ${text}
             networkModal.classList.remove('invisible', 'opacity-0');
             networkModal.querySelector('.modal-content').classList.remove('scale-95');
             
-            // モーダルを開いた瞬間に描画を実行
-            // vis.jsはコンテナが表示されている必要があるため
             setTimeout(() => {
                 drawNetworkDiagram();
-            }, 50); // トランジションを待つ
+            }, 50);
 
-            // ノード情報エリアをリセット
             nodeInfoDiv.innerHTML = '<p class="text-gray-500">ネットワーク図のノードをクリックすると、ここに要約が表示されます。</p>';
             downloadInfoButton.disabled = true;
             downloadInfoButton.dataset.fileName = "";
@@ -612,16 +590,15 @@ ${text}
         }
 
         /**
-         * ★★★ 修正: ネットワーク図を描画する (グリッドレイアウト、Stage対応) ★★★
+         * ★★★ 修正: ネットワーク図を描画 (特別ノード配置、色分け修正) ★★★
          */
         function drawNetworkDiagram() {
             if (currentNetwork) {
                 currentNetwork.destroy();
                 currentNetwork = null;
             }
-            networkDiagramDiv.innerHTML = ''; // クリア
+            networkDiagramDiv.innerHTML = '';
 
-            // ★★★ 修正: window.vis でチェック ★★★
             if (typeof window.vis === 'undefined') {
                 console.error("vis.js library is not loaded.");
                 networkDiagramDiv.innerHTML = '<p class="p-4 text-red-500">エラー: ネットワークライブラリ(vis.js)の読み込みに失敗しました。</p>';
@@ -630,13 +607,10 @@ ${text}
 
             const db = loadDatabase();
 
-            // ★★★ 修正: ソート順を 年 -> Stage (降順) -> カテゴリ -> 企画書No に変更 ★★★
-            // Stage (Stage5が上)
             const stageOrder = ['Stage5', 'Stage4', 'Stage3', 'Stage2', 'Stage1', 'Unknown'];
-            // カテゴリ (Aが上)
             const categoryOrder = ['A', 'B', 'C', 'D', 'E', 'default', 'error'];
 
-            // ★★★ 修正: ファイル名解析ロジック (db.sort内) - 6要素ルールのみ ★★★
+            // ★★★ 修正: カテゴリ抽出を堅牢化 ★★★
             const parseFileName = (fileName) => {
                 const baseName = fileName.substring(0, fileName.lastIndexOf('.')) || fileName;
                 const parts = baseName.split('_');
@@ -644,17 +618,17 @@ ${text}
                 let docId, year, stage, cat;
 
                 if (parts.length >= 6) {
-                    // Rule 1: No_年_前No_Stage_カテゴリ_資料名
                     docId = parts[0] || baseName;
                     year = parts[1];
                     stage = parts[3].startsWith('Stage') ? parts[3].trim() : 'Unknown';
-                    cat = categoryOrder.includes(parts[4].toUpperCase().trim()) ? parts[4].toUpperCase().trim() : 'default';
+                    // ★ 堅牢なカテゴリチェック
+                    const rawCat = parts[4] ? parts[4].toUpperCase().trim() : 'default';
+                    cat = categoryOrder.includes(rawCat) ? rawCat : 'default';
                 } else {
-                    // ルール外
                     docId = parts[0] || baseName;
                     year = 'Unknown';
                     stage = 'Unknown';
-                    cat = 'error'; // ルール外は 'error' カテゴリ
+                    cat = 'error';
                 }
                 return { docId, year, stage, cat };
             };
@@ -663,22 +637,11 @@ ${text}
                 const infoA = parseFileName(a.id);
                 const infoB = parseFileName(b.id);
                 
-                // 1. 年 (昇順)
-                if (infoA.year !== infoB.year) {
-                    return infoA.year.localeCompare(infoB.year);
-                }
-                // 2. Stage (降順)
-                if (infoA.stage !== infoB.stage) {
-                    return stageOrder.indexOf(infoA.stage) - stageOrder.indexOf(infoB.stage);
-                }
-                // 3. カテゴリ (昇順)
-                if (infoA.cat !== infoB.cat) {
-                    return categoryOrder.indexOf(infoA.cat) - categoryOrder.indexOf(infoB.cat);
-                }
-                // 4. 企画書No (昇順)
+                if (infoA.year !== infoB.year) return infoA.year.localeCompare(infoB.year);
+                if (infoA.stage !== infoB.stage) return stageOrder.indexOf(infoA.stage) - stageOrder.indexOf(infoB.stage);
+                if (infoA.cat !== infoB.cat) return categoryOrder.indexOf(infoA.cat) - categoryOrder.indexOf(infoB.cat);
                 return infoA.docId.localeCompare(infoB.docId);
             });
-            // ★★★ ソート処理ここまで ★★★
 
 
             if (db.length === 0) {
@@ -689,22 +652,15 @@ ${text}
             const nodes = [];
             const edges = [];
             
-            // X座標: 年 (250px間隔)
             const x_step = 250; 
-            // Y座標: Stage (150px間隔)
             const y_stage_step = 150; 
-            // Y座標: カテゴリ (100px間隔)
             const y_cat_step = 100;
+            // ★★★ 追加: 特別ノードのY座標 ★★★
+            const y_special_base = -300; // 最上部のY座標
             
-            // X座標計算用のMap
             const yearMap = new Map();
-            // 値: { year: string, category: string, stage: string, files: Array<{...}> }
             const analysisMap = new Map();
             
-            // 重複ノード（企画書No）のチェック用
-            const addedNodes = new Set();
-            
-            // X軸: 年
             const sortedYears = [...new Set(db.map(item => (item.id.split('_')[1] || 'Unknown')))].sort();
             sortedYears.forEach((year, index) => yearMap.set(year, index));
 
@@ -716,134 +672,131 @@ ${text}
                 
                 let docId, year, prevDocIdsStr, stage, category;
 
-                // ★★★ 修正: ファイル名ルール解析 (analysisMap作成用) - 6要素ルールのみ ★★★
+                // ★★★ 修正: カテゴリ抽出を堅牢化 (analysisMap作成用) ★★★
                 if (parts.length >= 6) {
-                    // Rule 1: No_年_前No_Stage_カテゴリ_資料名
                     docId = parts[0] || baseName;
                     year = parts[1];
                     prevDocIdsStr = parts[2];
                     stage = parts[3].startsWith('Stage') ? parts[3].trim() : 'Unknown';
-                    category = categoryOrder.includes(parts[4].toUpperCase().trim()) ? parts[4].toUpperCase().trim() : 'default';
+                    const rawCat = parts[4] ? parts[4].toUpperCase().trim() : 'default';
+                    category = categoryOrder.includes(rawCat) ? rawCat : 'default';
                 } else {
-                    // ルール外
                     docId = parts[0] || baseName;
                     year = 'Unknown';
                     prevDocIdsStr = '0000';
                     stage = 'Unknown';
-                    category = 'error'; // ルール外は 'error' カテゴリ
+                    category = 'error';
                 }
+                
+                // ★★★ 追加: 特別ノードの判定 ★★★
+                const isSpecial = item.id.includes('テーマ審議会') || item.id.includes('棚入れ');
 
 
-                // ★ analysisMap にデータを集約
                 if (!analysisMap.has(docId)) {
                     analysisMap.set(docId, {
                         year: year,
-                        category: category, // ★ 企画書Noのカテゴリ (最初に見つかったもの)
-                        stage: stage,       // ★ 企画書NoのStage (最初に見つかったもの)
+                        category: category,
+                        stage: stage,
                         files: [],
-                        prevDocIdsStr: prevDocIdsStr // ★ 企画書Noの親 (最初に見つかったもの)
+                        prevDocIdsStr: prevDocIdsStr,
+                        isSpecial: isSpecial // ★ フラグを新規追加
                     });
+                } else if (isSpecial) {
+                    analysisMap.get(docId).isSpecial = true; // ★ 1つでも該当すればtrue
                 }
-                // ファイル情報は、企画書Noに関わらず常に追加
+
                 analysisMap.get(docId).files.push({
                     fileName: item.id,
                     analysis: item.analysis,
-                    prevDocIdsStr: prevDocIdsStr // ★ ファイルごとの親
+                    prevDocIdsStr: prevDocIdsStr
                 });
             });
 
             // --- 2. ノードの作成 (analysisMapから) ---
-
-            // ★★★ 修正: analysisMapのエントリをソート (Y座標計算のため) ★★★
             const sortedNodesData = [...analysisMap.entries()].sort((a, b) => {
-                const infoA = a[1]; // data
-                const infoB = b[1]; // data
+                const infoA = a[1];
+                const infoB = b[1];
                 
                 // 1. 年 (昇順)
-                if (infoA.year !== infoB.year) {
-                    return infoA.year.localeCompare(infoB.year);
-                }
+                if (infoA.year !== infoB.year) return infoA.year.localeCompare(infoB.year);
                 // 2. Stage (降順)
-                if (infoA.stage !== infoB.stage) {
-                    return stageOrder.indexOf(infoA.stage) - stageOrder.indexOf(infoB.stage);
-                }
+                if (infoA.stage !== infoB.stage) return stageOrder.indexOf(infoA.stage) - stageOrder.indexOf(infoB.stage);
                 // 3. カテゴリ (昇順)
-                if (infoA.category !== infoB.category) {
-                    return categoryOrder.indexOf(infoA.category) - categoryOrder.indexOf(infoB.category);
-                }
+                if (infoA.category !== infoB.category) return categoryOrder.indexOf(infoA.category) - categoryOrder.indexOf(infoB.category);
                 // 4. 企画書No (昇順)
-                return a[0].localeCompare(b[0]); // a[0] = docId
+                return a[0].localeCompare(b[0]);
             });
 
-            // 同じ (年, Stage, カテゴリ) 内でのYオフセット計算用
-            let yCounters = {}; // Key: "x_y_stage_y_cat", Value: count
+            let yCounters = {};
+            // ★★★ 追加: 特別ノードのY座標カウンター ★★★
+            let ySpecialCounter = 0;
 
-            sortedNodesData.forEach(([docId, data]) => { // ★ ソート済み配列を使用
+            sortedNodesData.forEach(([docId, data]) => {
                 
-                // X座標 (年)
                 const x_index = yearMap.get(data.year) || 0;
                 const x = x_index * x_step;
-                
-                // Y座標 (Stage + カテゴリ)
-                const y_stage_index = stageOrder.indexOf(data.stage);
-                const y_stage = y_stage_index * y_stage_step;
+                let y; // ★ Y座標を宣言
 
-                const y_cat_index = categoryOrder.indexOf(data.category);
-                const y_category = y_cat_index * y_cat_step;
+                // ★★★ 修正: 特別ノードのY座標を計算 ★★★
+                if (data.isSpecial) {
+                    y = y_special_base - (ySpecialCounter * 100);
+                    ySpecialCounter++;
+                } else {
+                    // 通常ノードのY座標
+                    const y_stage_index = stageOrder.indexOf(data.stage);
+                    const y_stage = y_stage_index * y_stage_step;
 
-                // 重なり防止オフセット
-                const y_key = `${x_index}_${y_stage_index}_${y_cat_index}`;
-                if (!yCounters[y_key]) {
-                    yCounters[y_key] = 0;
+                    const y_cat_index = categoryOrder.indexOf(data.category);
+                    const y_category = y_cat_index * y_cat_step;
+
+                    const y_key = `${x_index}_${y_stage_index}_${y_cat_index}`;
+                    if (!yCounters[y_key]) {
+                        yCounters[y_key] = 0;
+                    }
+                    const y_offset = yCounters[y_key] * 100; 
+                    yCounters[y_key]++;
+
+                    y = y_stage + y_category + y_offset;
                 }
-                // 100px = node height + margin
-                const y_offset = yCounters[y_key] * 100; 
-                yCounters[y_key]++;
-
-                const y = y_stage + y_category + y_offset;
-
 
                 const fileTitles = data.files.map(f => f.fileName).join('\n');
 
                 nodes.push({
-                    id: docId, // ★ IDは docId (企画書No)
-                    // ★★★ 修正: ラベルにカテゴリを追加 ★★★
+                    id: docId,
                     label: `${docId}\n(${data.category} / ${data.stage} / ${data.year})`, 
-                    title: fileTitles, // ホバータイトルはファイルリスト
-                    group: data.category, // ★ 色分け
-                    x: x,  // ★ X座標を指定
-                    y: y,  // ★ Y座標を指定
-                    fixed: true // ★★★ 修正: fixed: true にして物理エンジンを切る
+                    title: fileTitles,
+                    group: data.category, // ★ 色分け (堅牢化ロジックで抽出)
+                    x: x,
+                    y: y,
+                    fixed: true
                 });
             });
 
             // --- 3. エッジの作成 (再度DBをスキャン) ---
-            const addedEdges = new Set(); // ★ 重複エッジ防止用
+            const addedEdges = new Set();
 
             db.forEach(item => {
                 const baseName = item.id.substring(0, item.id.lastIndexOf('.')) || item.id;
                 const parts = baseName.split('_');
                 
-                const currentNodeDocId = parts[0]; // ★ このノードの docId
+                const currentNodeDocId = parts[0];
                 let prevDocIdsStr;
 
-                // ★★★ 修正: 前フェーズNoを取得 (6要素ルールのみ) ★★★
                 if (parts.length >= 6) { 
                     prevDocIdsStr = parts[2];
                 }
                 else { 
-                    prevDocIdsStr = '0000'; // ルール外は 0000 扱い
+                    prevDocIdsStr = '0000';
                 }
 
 
-                // エッジの追加
                 if (prevDocIdsStr !== '0000') {
                     const parentDocIds = prevDocIdsStr.split('AND');
                     parentDocIds.forEach(parentId => {
                         parentId = parentId.trim();
-                        if (parentId && analysisMap.has(parentId)) { // 親ノードが存在することを確認
+                        if (parentId && analysisMap.has(parentId)) {
                             const edgeId = `${parentId}->${currentNodeDocId}`;
-                            if (!addedEdges.has(edgeId)) { // ★ 重複エッジを追加しない
+                            if (!addedEdges.has(edgeId)) {
                                 edges.push({
                                     from: parentId,
                                     to: currentNodeDocId,
@@ -871,14 +824,13 @@ ${text}
             };
 
             const options = {
-                // ★★★ 修正: physics: false, layout: hierarchical: false ★★★
                 physics: false,
                 layout: {
                     hierarchical: false
                 },
                 nodes: {
                     shape: "box",
-                    size: 10, // この値は固定だが、ラベルによって幅は変わる
+                    size: 10,
                     margin: 10,
                     font: {
                         size: 14,
@@ -889,41 +841,37 @@ ${text}
                 },
                 groups: groupColors, // ★ 色分け
                 interaction: {
-                    dragNodes: true, // ノードをドラッグ可能にする (レイアウトは崩れる)
+                    dragNodes: true,
                     dragView: true,
                     zoomView: true,
                     hover: true
                 },
                 edges: {
                     smooth: {
-                        type: 'cubicBezier', // ★ 曲線
-                        forceDirection: "horizontal", // ★ 横移動（年）を優先
-                        roundness: 0.1 // ★ 修正: 0.3 -> 0.1 (より直線的に)
+                        type: 'cubicBezier',
+                        forceDirection: "horizontal",
+                        roundness: 0.1
                     },
                     edges: {
                         color: {
-                            inherit: false // ★ falseにしないと↑のcolor指定が効かない
+                            inherit: false
                         }
                     }
                 }
             };
 
-            // ★★★ 修正: window.vis を使用 ★★★
             currentNetwork = new window.vis.Network(networkDiagramDiv, data, options);
 
-            // ★★★ 修正: ノードクリック時のイベントリスナー (集約対応) ★★★
             currentNetwork.on("click", function(params) {
                 if (params.nodes.length > 0) {
                     const nodeId = params.nodes[0];
                     const nodeData = analysisMap.get(nodeId);
                     
                     if (nodeData) {
-                        // ノード情報をHTMLとして構築
                         let infoHtml = '';
-                        let textToSave = ''; // テキスト保存用
+                        let textToSave = '';
 
                         nodeData.files.forEach(file => {
-                            // 重要ポイントのみを抽出
                             const analysisText = file.analysis;
                             const pointsMatch = analysisText.match(/【技術の棚入れ \(重要ポイント\)】([\s\S]*)/);
                             const importantPoints = pointsMatch ? pointsMatch[1].trim() : '重要ポイントがありません。';
@@ -938,7 +886,6 @@ ${text}
 
                         nodeInfoDiv.innerHTML = infoHtml;
                         downloadInfoButton.disabled = false;
-                        // ★ テキスト保存用に docId と テキスト内容を保存
                         downloadInfoButton.dataset.fileName = nodeId; 
                         downloadInfoButton.dataset.text = textToSave;
 
@@ -947,7 +894,6 @@ ${text}
                         downloadInfoButton.disabled = true;
                     }
                 } else {
-                    // ノード以外をクリックした場合はリセット
                     nodeInfoDiv.innerHTML = '<p class="text-gray-500">ネットワーク図のノードをクリックすると、ここに要約が表示されます。</p>';
                     downloadInfoButton.disabled = true;
                 }
@@ -956,35 +902,26 @@ ${text}
 
         // --- JPEGダウンロード / 履歴削除機能 ---
         
-        /**
-         * ネットワーク図をJPEGとしてダウンロードする
-         */
         async function downloadNetworkAsJPEG() {
             if (!currentNetwork) return;
 
-            // 1. vis.jsのcanvasを取得
             const canvas = networkDiagramDiv.querySelector('canvas');
             if (!canvas) {
                 console.error("Canvasが見つかりません。");
                 return;
             }
             
-            // 2. 背景が透明な場合があるため、オフスクリーンCanvasで背景を白に設定
             const offscreenCanvas = document.createElement('canvas');
             offscreenCanvas.width = canvas.width;
             offscreenCanvas.height = canvas.height;
             const ctx = offscreenCanvas.getContext('2d');
             
-            // 背景を白で塗りつぶし
-            ctx.fillStyle = '#FFFFFF'; // 白背景
+            ctx.fillStyle = '#FFFFFF';
             ctx.fillRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
             ctx.drawImage(canvas, 0, 0);
 
-            // 3. データURLを取得
-            // JPEG形式、品質 0.9 (高画質)
             const dataURL = offscreenCanvas.toDataURL("image/jpeg", 0.9);
 
-            // 4. ダウンロードリンクを作成してクリック
             const link = document.createElement('a');
             link.href = dataURL;
             link.download = 'document_network_diagram.jpeg';
@@ -993,19 +930,15 @@ ${text}
             document.body.removeChild(link);
         }
 
-        /**
-         * ★★★ 修正: ノード情報のテキスト（重要ポイント）をダウンロードする (集約対応) ★★★
-         */
         function downloadNodeInfo() {
             const textToSave = downloadInfoButton.dataset.text;
-            const baseFileName = downloadInfoButton.dataset.fileName || "node_info"; // ★ docId が入る
+            const baseFileName = downloadInfoButton.dataset.fileName || "node_info";
             
             if (!textToSave) {
                 console.warn("保存するテキストがありません。");
                 return;
             }
 
-            // ファイル名のサニタイズ (簡易)
             let safeFileName = baseFileName.replace(/[^a-z0-9_AND-]/gi, '-');
             
             const fileName = `${safeFileName}_important_points.txt`;
