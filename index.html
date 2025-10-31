@@ -205,7 +205,10 @@
 
     <script type="module">
         // PDF.jsのワーカーパスを設定
-        pdfjsLib.GlobalWorkerOptions.workerSrc = document.documentElement.style.getPropertyValue('--pdf-worker-src');
+        // ★★★ 修正: グローバルスコープの pdfjsLib を window.pdfjsLib で参照 ★★★
+        if (typeof window.pdfjsLib !== 'undefined') {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = document.documentElement.style.getPropertyValue('--pdf-worker-src');
+        }
 
         const apiKeyInput = document.getElementById('apiKey');
         const fileUpload = document.getElementById('fileUpload');
@@ -241,12 +244,15 @@
 
         // --- ライブラリ読み込みチェック ---
         function checkLibraries() {
-            if (typeof pdfjsLib !== 'undefined' && typeof JSZip !== 'undefined' && typeof vis !== 'undefined' && typeof tailwind !== 'undefined') {
+            // ★★★ 修正: グローバルライブラリを window.xxx でチェック ★★★
+            if (typeof window.pdfjsLib !== 'undefined' && typeof window.JSZip !== 'undefined' && typeof window.vis !== 'undefined' && typeof window.tailwind !== 'undefined') {
                 console.log("All libraries loaded.");
                 analyzeButton.disabled = false;
                 showNetworkButton.disabled = false;
                 analyzeButton.textContent = "分析を実行";
                 showNetworkButton.textContent = "関係図を表示";
+                // ★★★ 修正: ライブラリロード後にワーカーパスを再設定 ★★★
+                window.pdfjsLib.GlobalWorkerOptions.workerSrc = document.documentElement.style.getPropertyValue('--pdf-worker-src');
             } else {
                 console.warn("Waiting for libraries to load... (pdf.js, JSZip, vis.js, tailwind)");
                 analyzeButton.disabled = true;
@@ -397,7 +403,8 @@
         // --- テキスト抽出 ---
         async function extractTextFromPdf(file) {
             const arrayBuffer = await file.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            // ★★★ 修正: グローバルスコープの pdfjsLib を window.pdfjsLib で参照 ★★★
+            const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
             let textContent = '';
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
@@ -409,7 +416,8 @@
 
         async function extractTextFromDocx(file) {
             const arrayBuffer = await file.arrayBuffer();
-            const zip = await JSZip.loadAsync(arrayBuffer);
+            // ★★★ 修正: グローバルスコープの JSZip を window.JSZip で参照 ★★★
+            const zip = await window.JSZip.loadAsync(arrayBuffer);
             const content = await zip.file("word/document.xml").async("string");
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(content, "text/xml");
@@ -423,7 +431,8 @@
 
         async function extractTextFromPptx(file) {
             const arrayBuffer = await file.arrayBuffer();
-            const zip = await JSZip.loadAsync(arrayBuffer);
+            // ★★★ 修正: グローバルスコープの JSZip を window.JSZip で参照 ★★★
+            const zip = await window.JSZip.loadAsync(arrayBuffer);
             const slideFiles = [];
             zip.folder("ppt/slides").forEach((relativePath, file) => {
                 if (relativePath.startsWith("slide") && relativePath.endsWith(".xml")) {
@@ -465,11 +474,11 @@
 ${text}
 
 # あなたのタスク:
-1.  **内容の要約 (500字程度)**: このドキュメントが何について書かれているかを簡潔に要約してください。
+1.  **内容の要約 (200字程度)**: このドキュメントが何について書かれているかを簡潔に要約してください。
 2.  **技術の棚入れ (重要ポイント)**: このドキュメントから得られる重要な知見、技術的なポイント、決定事項などを箇条書きで抽出してください。
 
 # 回答フォーマット (厳守):
-【内容の要約 (500字程度)】
+【内容の要約 (200字程度)】
 ここに要約を記述
 
 【技術の棚入れ (重要ポイント)】
@@ -612,8 +621,10 @@ ${text}
             }
             networkDiagramDiv.innerHTML = ''; // クリア
 
-            if (typeof vis === 'undefined' || !window.vis) {
+            // ★★★ 修正: window.vis でチェック ★★★
+            if (typeof window.vis === 'undefined') {
                 console.error("vis.js library is not loaded.");
+                networkDiagramDiv.innerHTML = '<p class="p-4 text-red-500">エラー: ネットワークライブラリ(vis.js)の読み込みに失敗しました。</p>';
                 return;
             }
 
@@ -897,6 +908,7 @@ ${text}
                 }
             };
 
+            // ★★★ 修正: window.vis を使用 ★★★
             currentNetwork = new window.vis.Network(networkDiagramDiv, data, options);
 
             // ★★★ 修正: ノードクリック時のイベントリスナー (集約対応) ★★★
