@@ -225,7 +225,7 @@
 
             if (!apiKey) return showError("APIキーを入力してください。");
             if (files.length === 0) return showError("分析するファイルを選択してください。");
-            if (files.length > 10) return showError("一度に分析できるファイルは10件までです。");
+            if (files.length > 20) return showError("一度に分析できるファイルは20件までです。");
 
             hideError(); hideResult();
             showLoading(`ファイル ${files.length}件を処理中...`);
@@ -338,11 +338,11 @@
 ${text}
 
 # あなたのタスク:
-1.  **内容の要約 (500字程度)**: このドキュメントが何について書かれているかを簡潔に要約してください。
+1.  **内容の要約 (200字程度)**: このドキュメントが何について書かれているかを簡潔に要約してください。
 2.  **技術の棚入れ (重要ポイント)**: このドキュメントから得られる重要な知見、技術的なポイント、決定事項などを箇条書きで抽出してください。
 
 # 回答フォーマット (厳守):
-【内容の要約 (500字程度)】
+【内容の要約 (200字程度)】
 ここに要約を記述
 
 【技術の棚入れ (重要ポイント)】
@@ -516,7 +516,7 @@ ${text}
             const yCatStep = 100;
 
             // ★ 特別ノード用：Stage5ラインより少し上に固定（年ごとに縦位置をずらす）
-            const SPECIAL_BASE = -60;   // Stage5帯より少し上（Stage5のy=0の上）
+            const SPECIAL_BASE = -100;   // Stage5帯より少し上（Stage5のy=0の上）
             const SPECIAL_STEP = 80;    // 同一年内での重なり回避
             const specialCounters = {}; // yearIndex -> count
 
