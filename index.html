@@ -603,16 +603,18 @@ ${truncatedText}
 
                 if (parts.length >= 6) { // Rule 1: No_年_前No_Stage_カテゴリ_資料名
                     year = parts[1];
-                    stage = parts[3].startsWith('Stage') ? parts[3] : 'Unknown';
-                    cat = categoryOrder.includes(parts[4].toUpperCase()) ? parts[4].toUpperCase() : 'default';
+                    stage = parts[3].startsWith('Stage') ? parts[3].trim() : 'Unknown';
+                    // ★ 修正: trim()
+                    cat = categoryOrder.includes(parts[4].toUpperCase().trim()) ? parts[4].toUpperCase().trim() : 'default';
                 } else if (parts.length === 5) {
                     year = parts[1];
                     if (parts[3].startsWith('Stage')) { // Rule: No_年_前No_Stage_資料名
-                        stage = parts[3];
+                        stage = parts[3].trim();
                         cat = 'default';
-                    } else if (categoryOrder.includes(parts[3].toUpperCase())) { // Rule: No_年_前No_カテゴリ_資料名
+                    // ★ 修正: trim()
+                    } else if (categoryOrder.includes(parts[3].toUpperCase().trim())) { // Rule: No_年_前No_カテゴリ_資料名
                         stage = 'Unknown';
-                        cat = parts[3].toUpperCase();
+                        cat = parts[3].toUpperCase().trim();
                     } else { // Rule 4 with underscore in name
                         stage = 'Unknown';
                         cat = 'default';
@@ -695,17 +697,19 @@ ${truncatedText}
                 if (parts.length >= 6) { // Rule 1: No_年_前No_Stage_カテゴリ_資料名
                     year = parts[1];
                     prevDocIdsStr = parts[2];
-                    stage = parts[3].startsWith('Stage') ? parts[3] : 'Unknown';
-                    category = categoryOrder.includes(parts[4].toUpperCase()) ? parts[4].toUpperCase() : 'default';
+                    stage = parts[3].startsWith('Stage') ? parts[3].trim() : 'Unknown';
+                    // ★ 修正: trim()
+                    category = categoryOrder.includes(parts[4].toUpperCase().trim()) ? parts[4].toUpperCase().trim() : 'default';
                 } else if (parts.length === 5) {
                     year = parts[1];
                     prevDocIdsStr = parts[2];
                     if (parts[3].startsWith('Stage')) { // Rule: No_年_前No_Stage_資料名
-                        stage = parts[3];
+                        stage = parts[3].trim();
                         category = 'default';
-                    } else if (categoryOrder.includes(parts[3].toUpperCase())) { // Rule: No_年_前No_カテゴリ_資料名
+                    // ★ 修正: trim()
+                    } else if (categoryOrder.includes(parts[3].toUpperCase().trim())) { // Rule: No_年_前No_カテゴリ_資料名
                         stage = 'Unknown';
-                        category = parts[3].toUpperCase();
+                        category = parts[3].toUpperCase().trim();
                     } else { // Rule 4 with underscore in name
                         stage = 'Unknown';
                         category = 'default';
@@ -864,7 +868,7 @@ ${truncatedText}
 
             const options = {
                 layout: {
-                    hierarchical: true // ★★★ 修正: 階層レイアウトを無効化
+                    hierarchical: false // ★★★ 修正: 階層レイアウトを無効化
                 },
                 physics: { // ★★★ 修正: 物理エンジンを無効化
                     enabled: false
@@ -884,11 +888,11 @@ ${truncatedText}
                 edges: {
                     smooth: {
                         enabled: true,
-                        type: "cubicBezier",
-                        forceDirection: "horizontal", // ★ 横移動（年）を優先
-                        roundness: 0.3
-                    },
-                    color: {
+                    type: "cubicBezier",
+                    forceDirection: "horizontal", // ★ 横移動（年）を優先
+                    roundness: 0.1 // ★ 修正: 0.3 -> 0.1 (より直線的に)
+                },
+                edges: {
                         color: '#616161',
                         highlight: '#1976D2'
                     },
