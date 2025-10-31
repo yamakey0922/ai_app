@@ -73,6 +73,15 @@
             white-space: pre-wrap;
             margin-bottom: 1rem;
         }
+
+        /* 凡例のスタイル */
+        .legend-item {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 0.85rem; color: #374151;
+        }
+        .legend-color {
+            width: 16px; height: 16px; border: 2px solid #111827; border-radius: 2px;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
@@ -94,7 +103,6 @@
                    accept=".pdf,.docx,.pptx"
                    multiple 
                    class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
-            <!-- ★★★ 修正: ファイル名ルールの説明を簡素化 ★★★ -->
             <p class="text-xs text-gray-500 mt-1">
                 ファイル名ルール (必須):<br>
                 `企画書No_発行年_前フェーズ企画書No_Stage?_カテゴリ_資料名.xxx`<br>
@@ -139,19 +147,18 @@
 
     <!-- ネットワーク図 表示モーダル -->
     <div id="networkModal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 opacity-0 invisible z-50">
-        <!-- ★ 修正: max-w-7xl -> max-w-full, h-[90vh] -> h-[95vh] (表示エリア拡大) -->
         <div class="modal-content bg-white rounded-xl shadow-2xl w-full max-w-full h-[95vh] p-6 transform scale-95">
             <!-- モーダルヘッダー -->
             <div class="flex justify-between items-center pb-4 border-b border-gray-200">
                 <h2 class="text-2xl font-bold text-gray-800">ドキュメント関係図</h2>
-                <button id="closeModalButton" class="text-gray-400 hover:text-gray-600">
+                <button id="closeModalButton" class="text-gray-400 hover:text-gray-600" aria-label="Close">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
             
             <!-- モーダルコンテンツ (図と情報) -->
             <div class="flex flex-col md:flex-row gap-4 pt-4 h-[calc(100%-80px)]">
-                <!-- ★ 修正: md:w-2/3 -> md:w-3/4 (グラフエリア拡大) -->
+                <!-- グラフエリア -->
                 <div class="w-full md:w-3/4 h-full border border-gray-200 rounded-md relative bg-gray-50">
                     <div id="networkDiagram" class="w-full h-full"></div>
                     <!-- ボタン類 -->
@@ -163,9 +170,21 @@
                             履歴を全削除...
                         </button>
                     </div>
+
+                    <!-- 凡例 -->
+                    <div class="absolute bottom-2 left-2 bg-white/90 backdrop-blur rounded-md border border-gray-200 p-2 shadow-sm">
+                        <div class="grid grid-cols-3 gap-x-4 gap-y-2">
+                            <div class="legend-item"><span class="legend-color" style="background:#FFF59D; border-color:#FBC02D"></span>A</div>
+                            <div class="legend-item"><span class="legend-color" style="background:#A5D6A7; border-color:#43A047"></span>B</div>
+                            <div class="legend-item"><span class="legend-color" style="background:#90CAF9; border-color:#1E88E5"></span>C</div>
+                            <div class="legend-item"><span class="legend-color" style="background:#CE93D8; border-color:#8E24AA"></span>D</div>
+                            <div class="legend-item"><span class="legend-color" style="background:#F48FB1; border-color:#D81B60"></span>E</div>
+                            <div class="legend-item"><span class="legend-color" style="background:#B0BEC5; border-color:#546E7A"></span>default/error</div>
+                        </div>
+                    </div>
                 </div>
                 
-                <!-- ★ 修正: md:w-1/3 -> md:w-1/4 (情報エリア縮小) -->
+                <!-- 情報エリア -->
                 <div class="w-full md:w-1/4">
                     <div class="flex justify-between items-center mb-2">
                         <h3 class="text-lg font-semibold">重要ポイント</h3>
@@ -590,7 +609,7 @@ ${text}
         }
 
         /**
-         * ★★★ 修正: ネットワーク図を描画 (特別ノード配置、色分け修正) ★★★
+         * ネットワーク図を描画（カテゴリ色分け修正済み）
          */
         function drawNetworkDiagram() {
             if (currentNetwork) {
@@ -610,7 +629,7 @@ ${text}
             const stageOrder = ['Stage5', 'Stage4', 'Stage3', 'Stage2', 'Stage1', 'Unknown'];
             const categoryOrder = ['A', 'B', 'C', 'D', 'E', 'default', 'error'];
 
-            // ★★★ 修正: カテゴリ抽出を堅牢化 ★★★
+            // カテゴリ抽出関数
             const parseFileName = (fileName) => {
                 const baseName = fileName.substring(0, fileName.lastIndexOf('.')) || fileName;
                 const parts = baseName.split('_');
@@ -621,7 +640,6 @@ ${text}
                     docId = parts[0] || baseName;
                     year = parts[1];
                     stage = parts[3].startsWith('Stage') ? parts[3].trim() : 'Unknown';
-                    // ★ 堅牢なカテゴリチェック
                     const rawCat = parts[4] ? parts[4].toUpperCase().trim() : 'default';
                     cat = categoryOrder.includes(rawCat) ? rawCat : 'default';
                 } else {
@@ -633,6 +651,7 @@ ${text}
                 return { docId, year, stage, cat };
             };
 
+            // 並び替え
             db.sort((a, b) => {
                 const infoA = parseFileName(a.id);
                 const infoB = parseFileName(b.id);
@@ -642,7 +661,6 @@ ${text}
                 if (infoA.cat !== infoB.cat) return categoryOrder.indexOf(infoA.cat) - categoryOrder.indexOf(infoB.cat);
                 return infoA.docId.localeCompare(infoB.docId);
             });
-
 
             if (db.length === 0) {
                 networkDiagramDiv.innerHTML = '<p class="p-4 text-gray-500">保存されているデータがありません。</p>';
@@ -655,8 +673,7 @@ ${text}
             const x_step = 250; 
             const y_stage_step = 150; 
             const y_cat_step = 100;
-            // ★★★ 追加: 特別ノードのY座標 ★★★
-            const y_special_base = -300; // 最上部のY座標
+            const y_special_base = -300; // 特別ノードの最上部Y
             
             const yearMap = new Map();
             const analysisMap = new Map();
@@ -664,15 +681,13 @@ ${text}
             const sortedYears = [...new Set(db.map(item => (item.id.split('_')[1] || 'Unknown')))].sort();
             sortedYears.forEach((year, index) => yearMap.set(year, index));
 
-
-            // --- 1. ノードデータの集約 (全データをスキャン) ---
+            // ノードデータ集約
             db.forEach(item => {
                 const baseName = item.id.substring(0, item.id.lastIndexOf('.')) || item.id;
                 const parts = baseName.split('_');
                 
                 let docId, year, prevDocIdsStr, stage, category;
 
-                // ★★★ 修正: カテゴリ抽出を堅牢化 (analysisMap作成用) ★★★
                 if (parts.length >= 6) {
                     docId = parts[0] || baseName;
                     year = parts[1];
@@ -688,9 +703,7 @@ ${text}
                     category = 'error';
                 }
                 
-                // ★★★ 追加: 特別ノードの判定 ★★★
                 const isSpecial = item.id.includes('テーマ審議会') || item.id.includes('棚入れ');
-
 
                 if (!analysisMap.has(docId)) {
                     analysisMap.set(docId, {
@@ -699,10 +712,10 @@ ${text}
                         stage: stage,
                         files: [],
                         prevDocIdsStr: prevDocIdsStr,
-                        isSpecial: isSpecial // ★ フラグを新規追加
+                        isSpecial: isSpecial
                     });
                 } else if (isSpecial) {
-                    analysisMap.get(docId).isSpecial = true; // ★ 1つでも該当すればtrue
+                    analysisMap.get(docId).isSpecial = true;
                 }
 
                 analysisMap.get(docId).files.push({
@@ -712,37 +725,28 @@ ${text}
                 });
             });
 
-            // --- 2. ノードの作成 (analysisMapから) ---
+            // ノード作成
             const sortedNodesData = [...analysisMap.entries()].sort((a, b) => {
                 const infoA = a[1];
                 const infoB = b[1];
-                
-                // 1. 年 (昇順)
                 if (infoA.year !== infoB.year) return infoA.year.localeCompare(infoB.year);
-                // 2. Stage (降順)
                 if (infoA.stage !== infoB.stage) return stageOrder.indexOf(infoA.stage) - stageOrder.indexOf(infoB.stage);
-                // 3. カテゴリ (昇順)
                 if (infoA.category !== infoB.category) return categoryOrder.indexOf(infoA.category) - categoryOrder.indexOf(infoB.category);
-                // 4. 企画書No (昇順)
                 return a[0].localeCompare(b[0]);
             });
 
             let yCounters = {};
-            // ★★★ 追加: 特別ノードのY座標カウンター ★★★
             let ySpecialCounter = 0;
 
             sortedNodesData.forEach(([docId, data]) => {
-                
                 const x_index = yearMap.get(data.year) || 0;
                 const x = x_index * x_step;
-                let y; // ★ Y座標を宣言
+                let y;
 
-                // ★★★ 修正: 特別ノードのY座標を計算 ★★★
                 if (data.isSpecial) {
                     y = y_special_base - (ySpecialCounter * 100);
                     ySpecialCounter++;
                 } else {
-                    // 通常ノードのY座標
                     const y_stage_index = stageOrder.indexOf(data.stage);
                     const y_stage = y_stage_index * y_stage_step;
 
@@ -765,30 +769,21 @@ ${text}
                     id: docId,
                     label: `${docId}\n(${data.category} / ${data.stage} / ${data.year})`, 
                     title: fileTitles,
-                    group: data.category, // ★ 色分け (堅牢化ロジックで抽出)
+                    group: data.category || 'default', // ← グループ名を明示
                     x: x,
                     y: y,
                     fixed: true
                 });
             });
 
-            // --- 3. エッジの作成 (再度DBをスキャン) ---
+            // エッジ作成
             const addedEdges = new Set();
-
             db.forEach(item => {
                 const baseName = item.id.substring(0, item.id.lastIndexOf('.')) || item.id;
                 const parts = baseName.split('_');
                 
                 const currentNodeDocId = parts[0];
-                let prevDocIdsStr;
-
-                if (parts.length >= 6) { 
-                    prevDocIdsStr = parts[2];
-                }
-                else { 
-                    prevDocIdsStr = '0000';
-                }
-
+                let prevDocIdsStr = (parts.length >= 6) ? parts[2] : '0000';
 
                 if (prevDocIdsStr !== '0000') {
                     const parentDocIds = prevDocIdsStr.split('AND');
@@ -801,7 +796,7 @@ ${text}
                                     from: parentId,
                                     to: currentNodeDocId,
                                     arrows: "to",
-                                    color: { color: '#848484', highlight: '#3498db' },
+                                    color: { color: '#9CA3AF', highlight: '#2563EB' }
                                 });
                                 addedEdges.add(edgeId);
                             }
@@ -810,52 +805,60 @@ ${text}
                 }
             });
 
-            // --- 4. ネットワークの描画 ---
-            const data = { nodes: nodes, edges: edges };
-            
+            // ★★ 修正ポイント：グループ色は color オブジェクトの下に置く ★★
             const groupColors = {
-                'A': { background: '#FFF59D', border: '#FBC02D' }, // Yellow
-                'B': { background: '#A5D6A7', border: '#43A047' }, // Green
-                'C': { background: '#90CAF9', border: '#1E88E5' }, // Blue
-                'D': { background: '#CE93D8', border: '#8E24AA' }, // Purple
-                'E': { background: '#F48FB1', border: '#D81B60' }, // Pink
-                'default': { background: '#B0BEC5', border: '#546E7A' }, // Gray
-                'error': { background: '#FFAB91', border: '#E64A19' }  // Orange (エラー)
+                'A': { color: { background: '#FFF59D', border: '#FBC02D',
+                        highlight: { background: '#FFE082', border: '#F9A825' },
+                        hover: { background: '#FFF59D', border: '#FBC02D' } } },
+                'B': { color: { background: '#A5D6A7', border: '#43A047',
+                        highlight: { background: '#C8E6C9', border: '#2E7D32' },
+                        hover: { background: '#A5D6A7', border: '#43A047' } } },
+                'C': { color: { background: '#90CAF9', border: '#1E88E5',
+                        highlight: { background: '#BBDEFB', border: '#1565C0' },
+                        hover: { background: '#90CAF9', border: '#1E88E5' } } },
+                'D': { color: { background: '#CE93D8', border: '#8E24AA',
+                        highlight: { background: '#E1BEE7', border: '#6A1B9A' },
+                        hover: { background: '#CE93D8', border: '#8E24AA' } } },
+                'E': { color: { background: '#F48FB1', border: '#D81B60',
+                        highlight: { background: '#F8BBD0', border: '#AD1457' },
+                        hover: { background: '#F48FB1', border: '#D81B60' } } },
+                'default': { color: { background: '#B0BEC5', border: '#546E7A',
+                        highlight: { background: '#CFD8DC', border: '#37474F' },
+                        hover: { background: '#B0BEC5', border: '#546E7A' } } },
+                'error': { color: { background: '#FFAB91', border: '#E64A19',
+                        highlight: { background: '#FFCCBC', border: '#BF360C' },
+                        hover: { background: '#FFAB91', border: '#E64A19' } } }
             };
 
+            const data = { nodes: nodes, edges: edges };
             const options = {
                 physics: false,
-                layout: {
-                    hierarchical: false
-                },
+                layout: { hierarchical: false },
                 nodes: {
                     shape: "box",
                     size: 10,
                     margin: 10,
-                    font: {
-                        size: 14,
-                        color: "#333"
-                    },
+                    font: { size: 14, color: "#333" },
                     borderWidth: 2,
-                    shadow: true,
+                    shadow: true
                 },
-                groups: groupColors, // ★ 色分け
+                // ここでグループ色を適用
+                groups: groupColors,
                 interaction: {
                     dragNodes: true,
                     dragView: true,
                     zoomView: true,
                     hover: true
                 },
+                // ★★ 修正：edges の二重ネストを解消し、色継承も無効化 ★★
                 edges: {
                     smooth: {
                         type: 'cubicBezier',
                         forceDirection: "horizontal",
                         roundness: 0.1
                     },
-                    edges: {
-                        color: {
-                            inherit: false
-                        }
+                    color: {
+                        inherit: false
                     }
                 }
             };
@@ -901,7 +904,6 @@ ${text}
         }
 
         // --- JPEGダウンロード / 履歴削除機能 ---
-        
         async function downloadNetworkAsJPEG() {
             if (!currentNetwork) return;
 
@@ -940,7 +942,6 @@ ${text}
             }
 
             let safeFileName = baseFileName.replace(/[^a-z0-9_AND-]/gi, '-');
-            
             const fileName = `${safeFileName}_important_points.txt`;
 
             try {
@@ -960,4 +961,3 @@ ${text}
     </script>
 </body>
 </html>
-
