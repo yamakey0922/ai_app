@@ -594,36 +594,50 @@ ${truncatedText}
                 const baseName = fileName.substring(0, fileName.lastIndexOf('.')) || fileName;
                 const parts = baseName.split('_');
                 
-                let docId, year, stage, cat;
+                let docId, year, prevDocIdsStr, stage, cat; // ★ prevDocIdsStr はここでは不要
 
                 docId = parts[0] || baseName;
                 year = 'Unknown';
                 stage = 'Unknown';
                 cat = 'default';
 
-                if (parts.length >= 6) { // Rule 1: No_年_前No_Stage_カテゴリ_資料名
+                if (parts.length >= 4) {
                     year = parts[1];
-                    stage = parts[3].startsWith('Stage') ? parts[3].trim() : 'Unknown';
-                    // ★ 修正: trim()
-                    cat = categoryOrder.includes(parts[4].toUpperCase().trim()) ? parts[4].toUpperCase().trim() : 'default';
-                } else if (parts.length === 5) {
-                    year = parts[1];
-                    if (parts[3].startsWith('Stage')) { // Rule: No_年_前No_Stage_資料名
-                        stage = parts[3].trim();
-                        cat = 'default';
-                    // ★ 修正: trim()
-                    } else if (categoryOrder.includes(parts[3].toUpperCase().trim())) { // Rule: No_年_前No_カテゴリ_資料名
+                    // prevDocIdsStr = parts[2]; // ソートには不要
+                }
+
+                if (parts.length >= 5) {
+                    const part3 = parts[3].trim();
+                    if (part3.startsWith('Stage')) {
+                        // Has Stage. Check for Category in part 4.
+                        stage = part3;
+                        if (parts.length >= 6) {
+                            const part4 = parts[4].toUpperCase().trim();
+                            if (categoryOrder.includes(part4)) {
+                                // Rule 1: No_年_前No_Stage_カテゴリ_資料名
+                                cat = part4;
+                            } else {
+                                // Rule: No_年_前No_Stage_資料名 (no category)
+                                cat = 'default';
+                            }
+                        } else {
+                             // Rule: No_年_前No_Stage_資料名 (no category, 5 parts)
+                             cat = 'default';
+                        }
+                    } else if (categoryOrder.includes(part3.toUpperCase())) {
+                        // No Stage, but has Category.
+                        // Rule 2: No_年_前No_カテゴリ_資料名
                         stage = 'Unknown';
-                        cat = parts[3].toUpperCase().trim();
-                    } else { // Rule 4 with underscore in name
+                        cat = part3.toUpperCase();
+                    } else {
+                        // No Stage, No Category.
+                        // Rule 3: No_年_前No_資料名
                         stage = 'Unknown';
                         cat = 'default';
                     }
-                } else if (parts.length === 4) { // Rule 4: No_年_前No_資料名
-                    year = parts[1];
-                    stage = 'Unknown';
-                    cat = 'default';
-                } else {
+                }
+                
+                if (parts.length < 4) {
                     cat = 'error';
                 }
                 return { docId, year, stage, cat };
@@ -694,32 +708,43 @@ ${truncatedText}
                 stage = 'Unknown';
                 category = 'default';
 
-                if (parts.length >= 6) { // Rule 1: No_年_前No_Stage_カテゴリ_資料名
+                if (parts.length >= 4) {
                     year = parts[1];
                     prevDocIdsStr = parts[2];
-                    stage = parts[3].startsWith('Stage') ? parts[3].trim() : 'Unknown';
-                    // ★ 修正: trim()
-                    category = categoryOrder.includes(parts[4].toUpperCase().trim()) ? parts[4].toUpperCase().trim() : 'default';
-                } else if (parts.length === 5) {
-                    year = parts[1];
-                    prevDocIdsStr = parts[2];
-                    if (parts[3].startsWith('Stage')) { // Rule: No_年_前No_Stage_資料名
-                        stage = parts[3].trim();
-                        category = 'default';
-                    // ★ 修正: trim()
-                    } else if (categoryOrder.includes(parts[3].toUpperCase().trim())) { // Rule: No_年_前No_カテゴリ_資料名
+                }
+
+                if (parts.length >= 5) {
+                    const part3 = parts[3].trim();
+                    if (part3.startsWith('Stage')) {
+                        // Has Stage. Check for Category in part 4.
+                        stage = part3;
+                        if (parts.length >= 6) {
+                            const part4 = parts[4].toUpperCase().trim();
+                            if (categoryOrder.includes(part4)) {
+                                // Rule 1: No_年_前No_Stage_カテゴリ_資料名
+                                category = part4;
+                            } else {
+                                // Rule: No_年_前No_Stage_資料名 (no category)
+                                category = 'default';
+                            }
+                        } else {
+                             // Rule: No_年_前No_Stage_資料名 (no category, 5 parts)
+                             category = 'default';
+                        }
+                    } else if (categoryOrder.includes(part3.toUpperCase())) {
+                        // No Stage, but has Category.
+                        // Rule 2: No_年_前No_カテゴリ_資料名
                         stage = 'Unknown';
-                        category = parts[3].toUpperCase().trim();
-                    } else { // Rule 4 with underscore in name
+                        category = part3.toUpperCase();
+                    } else {
+                        // No Stage, No Category.
+                        // Rule 3: No_年_前No_資料名
                         stage = 'Unknown';
                         category = 'default';
                     }
-                } else if (parts.length === 4) { // Rule 4: No_年_前No_資料名
-                    year = parts[1];
-                    prevDocIdsStr = parts[2];
-                    stage = 'Unknown';
-                    category = 'default';
-                } else {
+                }
+                
+                if (parts.length < 4) {
                     category = 'error';
                 }
 
@@ -818,9 +843,12 @@ ${truncatedText}
                 let prevDocIdsStr;
 
                 // ★★★ 修正: 前フェーズNoを取得 (全ルール対応) ★★★
-                if (parts.length >= 6) { prevDocIdsStr = parts[2]; }
-                else if (parts.length === 5) { prevDocIdsStr = parts[2]; }
-                else if (parts.length === 4) { prevDocIdsStr = parts[2]; }
+                if (parts.length >= 5) { // 5要素 (Stage or Cat) または 6要素 (Stage+Cat)
+                    prevDocIdsStr = parts[2];
+                }
+                else if (parts.length === 4) { // 4要素 (No_年_前No_資料名)
+                    prevDocIdsStr = parts[2]; 
+                }
                 else { prevDocIdsStr = '0000'; }
 
 
