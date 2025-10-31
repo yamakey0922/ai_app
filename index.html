@@ -589,46 +589,63 @@ ${truncatedText}
             const stageOrder = ['Stage5', 'Stage4', 'Stage3', 'Stage2', 'Stage1', 'Unknown'];
             const categoryOrder = ['A', 'B', 'C', 'D', 'E', 'default', 'error'];
 
-            db.sort((a, b) => {
-                const fNameA = a.id.substring(0, a.id.lastIndexOf('.')) || a.id;
-                const fNameB = b.id.substring(0, b.id.lastIndexOf('.')) || b.id;
+            // ★★★ 修正: ファイル名解析ロジック (db.sort内) ★★★
+            const parseFileName = (fileName) => {
+                const baseName = fileName.substring(0, fileName.lastIndexOf('.')) || fileName;
+                const parts = baseName.split('_');
                 
-                const partsA = fNameA.split('_');
-                const partsB = fNameB.split('_');
+                let docId, year, stage, cat;
 
-                let yearA, stageA, catA, docIdA;
-                let yearB, stageB, catB, docIdB;
+                docId = parts[0] || baseName;
+                year = 'Unknown';
+                stage = 'Unknown';
+                cat = 'default';
 
-                // Aの解析
-                docIdA = partsA[0] || '';
-                if (partsA.length >= 6) { yearA = partsA[1]; stageA = partsA[3].startsWith('Stage') ? partsA[3] : 'Unknown'; catA = partsA[4]; }
-                else if (partsA.length === 5) { yearA = partsA[1]; stageA = 'Unknown'; catA = partsA[3]; }
-                else if (partsA.length === 4) { yearA = partsA[1]; stageA = 'Unknown'; catA = 'default'; }
-                else { yearA = 'Unknown'; stageA = 'Unknown'; catA = 'error'; }
+                if (parts.length >= 6) { // Rule 1: No_年_前No_Stage_カテゴリ_資料名
+                    year = parts[1];
+                    stage = parts[3].startsWith('Stage') ? parts[3] : 'Unknown';
+                    cat = categoryOrder.includes(parts[4].toUpperCase()) ? parts[4].toUpperCase() : 'default';
+                } else if (parts.length === 5) {
+                    year = parts[1];
+                    if (parts[3].startsWith('Stage')) { // Rule: No_年_前No_Stage_資料名
+                        stage = parts[3];
+                        cat = 'default';
+                    } else if (categoryOrder.includes(parts[3].toUpperCase())) { // Rule: No_年_前No_カテゴリ_資料名
+                        stage = 'Unknown';
+                        cat = parts[3].toUpperCase();
+                    } else { // Rule 4 with underscore in name
+                        stage = 'Unknown';
+                        cat = 'default';
+                    }
+                } else if (parts.length === 4) { // Rule 4: No_年_前No_資料名
+                    year = parts[1];
+                    stage = 'Unknown';
+                    cat = 'default';
+                } else {
+                    cat = 'error';
+                }
+                return { docId, year, stage, cat };
+            };
 
-                // Bの解析
-                docIdB = partsB[0] || '';
-                if (partsB.length >= 6) { yearB = partsB[1]; stageB = partsB[3].startsWith('Stage') ? partsB[3] : 'Unknown'; catB = partsB[4]; }
-                else if (partsB.length === 5) { yearB = partsB[1]; stageB = 'Unknown'; catB = partsB[3]; }
-                else if (partsB.length === 4) { yearB = partsB[1]; stageB = 'Unknown'; catB = 'default'; }
-                else { yearB = 'Unknown'; stageB = 'Unknown'; catB = 'error'; }
-
+            db.sort((a, b) => {
+                const infoA = parseFileName(a.id);
+                const infoB = parseFileName(b.id);
 
                 // 1. 年(parts[1])でソート (昇順)
-                if (yearA !== yearB) return yearA.localeCompare(yearB);
+                if (infoA.year !== infoB.year) return infoA.year.localeCompare(infoB.year);
                 
                 // 2. Stageでソート (降順 = stageOrderのインデックス昇順)
-                const stageIndexA = stageOrder.indexOf(stageA);
-                const stageIndexB = stageOrder.indexOf(stageB);
+                const stageIndexA = stageOrder.indexOf(infoA.stage);
+                const stageIndexB = stageOrder.indexOf(infoB.stage);
                 if (stageIndexA !== stageIndexB) return stageIndexA - stageIndexB;
                 
                 // 3. カテゴリでソート (昇順)
-                const catIndexA = categoryOrder.indexOf(catA);
-                const catIndexB = categoryOrder.indexOf(catB);
+                const catIndexA = categoryOrder.indexOf(infoA.cat);
+                const catIndexB = categoryOrder.indexOf(infoB.cat);
                 if (catIndexA !== catIndexB) return catIndexA - catIndexB;
 
                 // 4. 企画書Noでソート (昇順)
-                return docIdA.localeCompare(docIdB);
+                return infoA.docId.localeCompare(infoB.docId);
             });
             // ★★★ ソート処理ここまで ★★★
 
@@ -668,34 +685,37 @@ ${truncatedText}
 
                 let docId, year, prevDocIdsStr, stage, category;
 
-                // ★★★ 修正: ファイル名ルール解析 (Stage対応) ★★★
-                if (parts.length >= 6) {
-                    // New rule: No_年_前No_Stage_カテゴリ_資料名
-                    docId = parts[0];
+                // ★★★ 修正: ファイル名ルール解析 (analysisMap作成用) ★★★
+                docId = parts[0] || baseName;
+                year = 'Unknown';
+                prevDocIdsStr = '0000';
+                stage = 'Unknown';
+                category = 'default';
+
+                if (parts.length >= 6) { // Rule 1: No_年_前No_Stage_カテゴリ_資料名
                     year = parts[1];
-                    prevDocIdsStr = parts[2]; // for edges
+                    prevDocIdsStr = parts[2];
                     stage = parts[3].startsWith('Stage') ? parts[3] : 'Unknown';
-                    category = parts[4].toUpperCase();
+                    category = categoryOrder.includes(parts[4].toUpperCase()) ? parts[4].toUpperCase() : 'default';
                 } else if (parts.length === 5) {
-                    // Old rule 2: No_年_前No_カテゴリ_資料名
-                    docId = parts[0];
                     year = parts[1];
-                    prevDocIdsStr = parts[2]; // for edges
-                    stage = 'Unknown'; // No stage info
-                    category = parts[3].toUpperCase();
-                } else if (parts.length === 4) {
-                    // Old rule 1: No_年_前No_資料名
-                    docId = parts[0];
+                    prevDocIdsStr = parts[2];
+                    if (parts[3].startsWith('Stage')) { // Rule: No_年_前No_Stage_資料名
+                        stage = parts[3];
+                        category = 'default';
+                    } else if (categoryOrder.includes(parts[3].toUpperCase())) { // Rule: No_年_前No_カテゴリ_資料名
+                        stage = 'Unknown';
+                        category = parts[3].toUpperCase();
+                    } else { // Rule 4 with underscore in name
+                        stage = 'Unknown';
+                        category = 'default';
+                    }
+                } else if (parts.length === 4) { // Rule 4: No_年_前No_資料名
                     year = parts[1];
-                    prevDocIdsStr = parts[2]; // for edges
+                    prevDocIdsStr = parts[2];
                     stage = 'Unknown';
                     category = 'default';
                 } else {
-                    // Rule violation
-                    docId = baseName;
-                    year = 'Unknown';
-                    prevDocIdsStr = '0000';
-                    stage = 'Unknown';
                     category = 'error';
                 }
 
@@ -719,16 +739,57 @@ ${truncatedText}
             });
 
             // --- 2. ノードの作成 (集約データから) ---
-            analysisMap.forEach((data, docId) => {
+            
+            // ★★★ 修正: analysisMapのエントリをソート (Y座標計算のため) ★★★
+            const sortedNodesData = [...analysisMap.entries()].sort((a, b) => {
+                const dataA = a[1];
+                const dataB = b[1];
+
+                // 1. 年
+                const yearA = yearMap.get(dataA.year) || 0;
+                const yearB = yearMap.get(dataB.year) || 0;
+                if (yearA !== yearB) return yearA - yearB;
+
+                // 2. Stage
+                const stageA = stageMap.get(dataA.stage) || 0;
+                const stageB = stageMap.get(dataB.stage) || 0;
+                if (stageA !== stageB) return stageA - stageB;
+
+                // 3. Category
+                const catA = categoryMap.get(dataA.category) || 0;
+                const catB = categoryMap.get(dataB.category) || 0;
+                if (catA !== catB) return catA - catB;
+
+                // 4. docId
+                return a[0].localeCompare(b[0]);
+            });
+            
+            // ★★★ 修正: Y座標の重なりを回避するためのカウンター ★★★
+            let yCounters = {}; // Key: "x_y_stage_y_cat", Value: count
+
+            sortedNodesData.forEach(([docId, data]) => { // ★ ソート済み配列を使用
                 // ホバー時に表示するファイルリストを作成
                 const fileTitles = data.files.map(f => f.fileName).join('\n');
                 
                 // ★★★ 修正: X, Y座標を手動計算 ★★★
                 const x = (yearMap.get(data.year) || 0) * 450; // X軸 = 年 (450px間隔)
                 
-                const y_stage = (stageMap.get(data.stage) || stageMap.get('Unknown')) * 250; // Y軸 = Stage (250px間隔)
-                const y_category = (categoryMap.get(data.category) || categoryMap.get('default')) * 40; // Y軸(サブ) = カテゴリ (40px間隔)
-                const y = y_stage + y_category;
+                const y_stage_val = stageMap.get(data.stage) || stageMap.get('Unknown');
+                const y_category_val = categoryMap.get(data.category) || categoryMap.get('default');
+                
+                const y_stage = y_stage_val * 300; // Y軸 = Stage (300px間隔)
+                const y_category = y_category_val * 60; // Y軸(サブ) = カテゴリ (60px間隔)
+                
+                // ★ Y座標のオフセットを計算
+                const y_key = `${x}_${y_stage_val}_${y_category_val}`;
+                if (!yCounters[y_key]) {
+                    yCounters[y_key] = 0;
+                }
+                const y_offset = yCounters[y_key] * 100; // 100px = node height + margin
+                yCounters[y_key]++;
+
+                const y = y_stage + y_category + y_offset;
+
 
                 nodes.push({
                     id: docId, // ★ IDは docId (企画書No)
@@ -737,7 +798,7 @@ ${truncatedText}
                     group: data.category, // ★ 色分け
                     x: x,  // ★ X座標を指定
                     y: y,  // ★ Y座標を指定
-                    fixed: false // ★ 物理エンジンで多少重なりを避ける
+                    fixed: true // ★★★ 修正: fixed: true にして物理エンジンを切る
                 });
             });
 
@@ -805,19 +866,8 @@ ${truncatedText}
                 layout: {
                     hierarchical: false // ★★★ 修正: 階層レイアウトを無効化
                 },
-                physics: { // ★★★ 修正: 物理エンジンを有効化 (重なり防止のため)
-                    enabled: true,
-                    solver: 'barnesHut',
-                    barnesHut: {
-                        gravitationalConstant: -10000,
-                        centralGravity: 0.1,
-                        springLength: 200, // X,Y指定があるので少し長め
-                        springConstant: 0.05,
-                        avoidOverlap: 0.5 // 重なりを避ける
-                    },
-                    stabilization: {
-                        iterations: 200
-                    }
+                physics: { // ★★★ 修正: 物理エンジンを無効化
+                    enabled: false
                 },
                 nodes: {
                     shape: 'box',
